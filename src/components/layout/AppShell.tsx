@@ -5,7 +5,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import type { ReactNode } from "react";
-import { useRoute } from "@/router";
+import { linkTo, useRoute } from "@/router";
 import type { Page } from "@/router";
 import { useStore, useActivePlan } from "@/store/store";
 import { faDigits, todayJ, weekStart } from "@/domain/jalali";
@@ -104,7 +104,7 @@ function NavLink({ item, active, onClick }: { item: NavItem; active: boolean; on
   return (
     <a
       href={`#/${item.page}`}
-      onClick={onClick}
+      onClick={(e) => { linkTo(item.page)(e); onClick?.(); }}
       aria-current={active ? "page" : undefined}
       className={cx(
         "group flex h-9 items-center gap-2.5 rounded-lg px-2.5 text-sm transition-colors",
@@ -161,7 +161,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           const Icon = n.icon;
           const active = page === n.page;
           return (
-            <a key={n.page} href={`#/${n.page}`} aria-current={active ? "page" : undefined}
+            <a key={n.page} href={`#/${n.page}`} onClick={linkTo(n.page)} aria-current={active ? "page" : undefined}
               className={cx("flex flex-col items-center gap-0.5 py-2 text-[11px]", active ? "font-semibold text-brand-ink" : "text-ink-3")}>
               <span className="relative"><Icon className="size-5" />{reviewDue && n.page === "review" && <DueDot className="absolute -end-1 -top-0.5" />}</span>{n.label}
             </a>

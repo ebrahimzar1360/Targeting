@@ -11,4 +11,4 @@ createRoot(document.getElementById("root")!).render(
 );
 
 // Offline support; new versions activate on the next load.
-if (import.meta.env.PROD && "serviceWorker" in navigator) registerSW({ immediate: true });
+if (import.meta.env.PROD && import.meta.env.MODE !== "artifact" && "serviceWorker" in navigator) registerSW({ immediate: true });

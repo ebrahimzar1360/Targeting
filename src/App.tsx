@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { Direction, Tooltip } from "radix-ui";
 import { AppShell } from "@/components/layout/AppShell";
 import { Toaster, toast } from "@/components/ui/toast";
-import { useStore, useActivePlan } from "@/store/store";
+import { useStore, useActivePlan, useHydrated } from "@/store/store";
 import { useRoute } from "@/router";
 import { Welcome } from "@/pages/Welcome";
 import { Dashboard } from "@/pages/Dashboard";
@@ -15,12 +15,27 @@ import { Review } from "@/pages/Review";
 import { Settings } from "@/pages/Settings";
 import { Guide } from "@/pages/Guide";
 import { Report } from "@/pages/Report";
+import { IS_ARTIFACT } from "@/platform";
 
+/**
+ * Light/dark theme. On the web it follows the user's setting; on claude.ai it follows the
+ * viewer's theme (`data-theme` on the root, or the system setting when absent).
+ */
 function useTheme() {
   const theme = useStore((s) => s.settings.theme);
   useEffect(() => {
     const mq = matchMedia("(prefers-color-scheme: dark)");
-    const apply = () => document.documentElement.classList.toggle("dark", theme === "dark" || (theme === "system" && mq.matches));
+    const root = document.documentElement;
+    const isDark = () => {
+      if (IS_ARTIFACT) {
+        const t = root.getAttribute("data-theme");
+        return t ? t === "dark" : mq.matches;
+      }
+      return theme === "dark" || (theme === "system" && mq.matches);
+    };
+    const apply = () => root.classList.toggle("dark", isDark());
+    const observer = IS_ARTIFACT ? new MutationObserver(apply) : null;
+    observer?.observe(root, { attributes: true, attributeFilter: ["data-theme"] });
     // Always print in the light theme.
     const light = () => document.documentElement.classList.remove("dark");
     apply();
@@ -28,6 +43,7 @@ function useTheme() {
     window.addEventListener("beforeprint", light);
     window.addEventListener("afterprint", apply);
     return () => {
+      observer?.disconnect();
       mq.removeEventListener("change", apply);
       window.removeEventListener("beforeprint", light);
       window.removeEventListener("afterprint", apply);
@@ -58,6 +74,7 @@ const PAGES = {
 export default function App() {
   useTheme();
   useUndoShortcut();
+  const hydrated = useHydrated();
   const plan = useActivePlan();
   const { page } = useRoute();
   const PageComp = PAGES[page];
@@ -66,7 +83,9 @@ export default function App() {
   return (
     <Direction.Provider dir="rtl">
       <Tooltip.Provider>
-        {plan ? (
+        {!hydrated ? (
+          <div className="grid min-h-dvh place-items-center text-sm text-ink-3" role="status">در حال بارگذاری برنامه‌ها…</div>
+        ) : plan ? (
           // Remount pages on plan switch so local editor state never leaks across plans.
           <AppShell><PageComp key={plan.id} /></AppShell>
         ) : (

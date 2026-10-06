@@ -6,6 +6,7 @@ import { buildSampleConsultant } from "@/data/sampleConsultant";
 import { importFile, pickFile } from "@/io/files";
 import { useStore } from "@/store/store";
 import { navigate } from "@/router";
+import { IS_ARTIFACT } from "@/platform";
 import { NewPlanDialog } from "./NewPlanDialog";
 
 export const METHOD_STEPS = [
@@ -53,7 +54,8 @@ export function Welcome() {
         </h1>
         <p className="mt-4 max-w-2xl text-base leading-8 text-ink-2">
           هدف‌ها از فاصله‌ی «وضعیت موجود» تا «وضعیت مطلوب» بیرون می‌آیند، به فعالیت‌های تاریخ‌دار وصل می‌شوند،
-          و اپ خودش بودجه، ظرفیت زمانی و ناهماهنگی‌ها را حساب می‌کند. داده‌ها فقط روی دستگاه شما ذخیره می‌شوند.
+          و اپ خودش بودجه، ظرفیت زمانی و ناهماهنگی‌ها را حساب می‌کند.{" "}
+          {IS_ARTIFACT ? "برنامه‌ها به‌صورت خصوصی در حساب claude.ai شما ذخیره می‌شوند." : "داده‌ها فقط روی دستگاه شما ذخیره می‌شوند."}
         </p>
 
         <div className="mt-10 grid gap-3 sm:grid-cols-3">

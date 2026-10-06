@@ -1,6 +1,10 @@
 import { useSyncExternalStore } from "react";
 
-/** Minimal hash router: "#/plan?open=a12" → { page: "plan", params: { open: "a12" } }. Works on any static host. */
+/**
+ * Minimal router: "#/plan?open=a12" → { page: "plan", params: { open: "a12" } }.
+ * The route lives in memory and is mirrored to the URL hash when the host allows it, so it
+ * works on any static host and inside claude.ai's sandboxed frame alike.
+ */
 export type Page = "dashboard" | "vision" | "requirements" | "plan" | "kpi" | "budget" | "review" | "report" | "settings" | "guide";
 const PAGES: Page[] = ["dashboard", "vision", "requirements", "plan", "kpi", "budget", "review", "report", "settings", "guide"];
 
@@ -12,26 +16,37 @@ function parse(hash: string): Route {
   return { page, params: Object.fromEntries(new URLSearchParams(query)) };
 }
 
-let cached = { hash: "", route: parse("") };
-function snapshot(): Route {
-  if (cached.hash !== location.hash) cached = { hash: location.hash, route: parse(location.hash) };
-  return cached.route;
-}
-const subscribe = (cb: () => void) => {
-  window.addEventListener("hashchange", cb);
-  return () => window.removeEventListener("hashchange", cb);
-};
+const listeners = new Set<() => void>();
+let current: Route = parse(typeof location === "undefined" ? "" : location.hash);
+const set = (r: Route) => { current = r; listeners.forEach((l) => l()); };
 
-export const useRoute = () => useSyncExternalStore(subscribe, snapshot, snapshot);
+if (typeof window !== "undefined") {
+  const fromUrl = () => { if (location.hash.startsWith("#/")) set(parse(location.hash)); };
+  window.addEventListener("hashchange", fromUrl);
+  window.addEventListener("popstate", fromUrl);
+}
+
+const subscribe = (cb: () => void) => { listeners.add(cb); return () => { listeners.delete(cb); }; };
+export const useRoute = () => useSyncExternalStore(subscribe, () => current, () => current);
+
+const toHash = (r: Route) => { const q = new URLSearchParams(r.params).toString(); return `#/${r.page}${q ? `?${q}` : ""}`; };
 
 export function navigate(page: Page, params: Record<string, string> = {}) {
-  const q = new URLSearchParams(params).toString();
-  location.hash = `/${page}${q ? `?${q}` : ""}`;
+  const r = { page, params };
+  try { history.pushState(null, "", toHash(r)); } catch { /* URL is read-only here; memory route still works */ }
+  set(r);
 }
 
 /** Removes query params (e.g. after a sheet closes) without adding a history entry. */
 export function clearParams() {
-  const { page } = snapshot();
-  history.replaceState(null, "", `#/${page}`);
-  window.dispatchEvent(new HashChangeEvent("hashchange"));
+  const r = { page: current.page, params: {} };
+  try { history.replaceState(null, "", toHash(r)); } catch { /* ignore */ }
+  set(r);
 }
+
+/** Click handler for in-app links: keeps the href for semantics, navigates in memory. */
+export const linkTo = (page: Page) => (e: { preventDefault(): void; metaKey?: boolean; ctrlKey?: boolean }) => {
+  if (e.metaKey || e.ctrlKey) return;
+  e.preventDefault();
+  navigate(page);
+};

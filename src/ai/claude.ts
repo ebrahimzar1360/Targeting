@@ -4,6 +4,7 @@ import { PRIORITIES, STATUSES } from "@/domain/defaults";
 import { addDays, parseLooseJ, todayJ } from "@/domain/jalali";
 import type { Plan, Requirement } from "@/domain/schema";
 import type { Settings } from "@/store/store";
+import { IS_ARTIFACT, capability, errorCode } from "@/platform";
 
 /**
  * Optional AI assistant. Calls the Claude API straight from the browser with the user's own
@@ -11,7 +12,8 @@ import type { Settings } from "@/store/store";
  * shows as suggestions; nothing is applied without the user's click.
  */
 
-export const isAiReady = (s: Settings) => s.aiKey.trim().length > 10;
+/** On claude.ai the assistant uses the viewer's own Claude (the `sample` capability), so no key is needed. */
+export const isAiReady = (s: Settings) => IS_ARTIFACT || s.aiKey.trim().length > 10;
 
 const SYSTEM = `You help a person plan with the "Design Structure Matrix" (ماتریس ساختار طراحی) goal-setting method:
 1. Vision statement and a role model (الگو) that already has the desired state.
@@ -55,6 +57,7 @@ async function loadSdk() {
 }
 
 async function ask<T>(s: Settings, schema: z.ZodType<T>, prompt: string, effort: "low" | "medium"): Promise<T> {
+  if (IS_ARTIFACT) return askViaSample(schema, prompt, effort);
   const custom = !!s.aiBaseUrl.trim();
   const { SDK, betaZodOutputFormat } = await loadSdk();
   const client = new SDK({ apiKey: s.aiKey.trim(), baseURL: s.aiBaseUrl.trim() || undefined, dangerouslyAllowBrowser: true, maxRetries: 1 });
@@ -74,6 +77,40 @@ async function ask<T>(s: Settings, schema: z.ZodType<T>, prompt: string, effort:
     return res.parsed_output as T;
   } catch (e) {
     throw new Error(explain(SDK, e));
+  }
+}
+
+/**
+ * claude.ai build: the frame cannot reach the API, so the request goes through the viewer's
+ * own Claude. There is no system prompt or schema parameter there, so both go in the prompt
+ * and the reply is validated with the same zod schema.
+ */
+async function askViaSample<T>(schema: z.ZodType<T>, prompt: string, effort: "low" | "medium"): Promise<T> {
+  const sample = await capability("sample");
+  if (!sample) throw new Error("دستیار هوش مصنوعی در این نما در دسترس نیست.");
+  const shape = JSON.stringify(z.toJSONSchema(schema));
+  const input = `${SYSTEM}\n\n${prompt}\n\nReply with only one JSON value that matches this JSON Schema (no prose, no code fences):\n${shape}`;
+  let raw: unknown;
+  try {
+    raw = await sample.json(input, { modelTier: effort === "medium" ? "complex" : "default" });
+  } catch (e) {
+    throw new Error(explainSample(errorCode(e)));
+  }
+  const res = schema.safeParse(raw);
+  if (!res.success) throw new Error("پاسخ مدل قابل خواندن نبود. دوباره امتحان کنید.");
+  return res.data;
+}
+
+function explainSample(code: string): string {
+  switch (code) {
+    case "not_granted": case "sampling_disabled": case "not_declared": case "capability_disabled": case "capability_removed":
+      return "اجازه‌ی استفاده از Claude برای این صفحه داده نشده یا در دسترس نیست.";
+    case "rate_limited": return "تعداد درخواست‌ها یا سقف استفاده‌ی شما پر شده؛ کمی بعد دوباره امتحان کنید.";
+    case "session_expired": return "دوباره وارد حساب claude.ai شوید.";
+    case "refused": return "Claude به این درخواست پاسخ نداد. متن را کمی تغییر دهید و دوباره امتحان کنید.";
+    case "invalid_json": case "empty_completion": return "پاسخ کامل نبود. دوباره امتحان کنید.";
+    case "prompt_too_large": return "برنامه برای یک درخواست خیلی بزرگ است.";
+    default: return "ارتباط با Claude برقرار نشد. دوباره امتحان کنید.";
   }
 }
 

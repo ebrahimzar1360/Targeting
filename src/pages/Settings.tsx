@@ -11,6 +11,9 @@ import { AI_MODELS, useStore, usePlan } from "@/store/store";
 import type { Theme } from "@/store/store";
 import { NewPlanDialog } from "./NewPlanDialog";
 import { navigate } from "@/router";
+import { IS_ARTIFACT } from "@/platform";
+import { useStorageMode } from "@/platform/storage";
+import type { SaveResult } from "@/io/files";
 
 export function Settings() {
   const plan = usePlan();
@@ -20,6 +23,14 @@ export function Settings() {
   const [toDelete, setToDelete] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const daysSinceBackup = lastBackupAt ? Math.floor((Date.now() - Date.parse(lastBackupAt)) / 86_400_000) : null;
+  const storageMode = useStorageMode((s) => s.mode);
+
+  /** Runs a save and reports the outcome; on claude.ai the viewer may decline the download. */
+  const save = async (run: () => Promise<SaveResult>, done: string, after?: () => void) => {
+    try {
+      if ((await run()) === "saved") { after?.(); toast.good(done); }
+    } catch (e) { toast.error((e as Error).message); }
+  };
 
   const doImport = async () => {
     const file = await pickFile(".json,.xlsx");
@@ -33,20 +44,22 @@ export function Settings() {
 
   return (
     <>
-      <PageHeader title="تنظیمات و پشتیبان" description="داده‌ها فقط در مرورگر همین دستگاه ذخیره می‌شوند. برای انتقال به دستگاه دیگر یا اشتراک با دیگران، فایل پشتیبان بگیرید." />
+      <PageHeader title="تنظیمات و پشتیبان" description={storageMode === "account"
+        ? "برنامه‌های شما در حساب claude.ai خودتان و به‌صورت خصوصی ذخیره می‌شوند و روی دستگاه‌های دیگر هم در دسترس‌اند. برای اشتراک با دیگران، فایل برنامه را بفرستید."
+        : "داده‌ها فقط در مرورگر همین دستگاه ذخیره می‌شوند. برای انتقال به دستگاه دیگر یا اشتراک با دیگران، فایل پشتیبان بگیرید."} />
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Card>
           <CardHeader title="پشتیبان‌گیری و انتقال" subtitle={lastBackupAt ? `آخرین پشتیبان: ${fmtJ(fromDate(new Date(lastBackupAt)))}` : "هنوز پشتیبانی گرفته نشده"}
             action={daysSinceBackup === null || daysSinceBackup > 14 ? <Badge tone="warning" dot>پشتیبان بگیرید</Badge> : <Badge tone="good" dot>به‌روز</Badge>} />
           <div className="grid grid-cols-1 gap-2 p-4 sm:p-5">
-            <Button className="justify-start" onClick={() => { exportJson(plans, "hadafnegar-backup"); markBackup(); toast.good("فایل پشتیبان همه‌ی برنامه‌ها دانلود شد."); }}>
+            <Button className="justify-start" onClick={() => save(() => exportJson(plans, "hadafnegar-backup"), "فایل پشتیبان همه‌ی برنامه‌ها ذخیره شد.", markBackup)}>
               <Download className="size-4" />پشتیبان کامل (JSON) — همه‌ی برنامه‌ها
             </Button>
-            <Button className="justify-start" onClick={() => { exportJson([plan]); toast.good("فایل این برنامه دانلود شد؛ می‌توانید آن را برای دیگران بفرستید."); }}>
+            <Button className="justify-start" onClick={() => save(() => exportJson([plan]), "فایل این برنامه ذخیره شد؛ می‌توانید آن را برای دیگران بفرستید.")}>
               <Download className="size-4" />فقط برنامه‌ی فعلی (JSON) — برای اشتراک‌گذاری
             </Button>
-            <Button className="justify-start" onClick={() => exportExcel(plan).catch((e) => toast.error(String(e)))}>
+            <Button className="justify-start" onClick={() => save(() => exportExcel(plan), "فایل Excel ذخیره شد.")}>
               <FileSpreadsheet className="size-4" />خروجی Excel برنامه‌ی فعلی
             </Button>
             <Button className="justify-start" onClick={doImport}>
@@ -57,6 +70,7 @@ export function Settings() {
         </Card>
 
         <Card>
+          {!IS_ARTIFACT && <>
           <CardHeader title="ظاهر" />
           <div className="p-4 sm:p-5">
             <Segmented<Theme> label="پوسته" value={settings.theme} onChange={(theme) => setSettings({ theme })}
@@ -66,6 +80,16 @@ export function Settings() {
                 { value: "dark", label: <><Moon className="size-3.5" />تیره</> },
               ]} />
           </div>
+          </>}
+          {IS_ARTIFACT ? (
+            <>
+              <CardHeader title="دستیار هوش مصنوعی" subtitle="پیشنهاد الزام، هدف و فعالیت و نقد برنامه با Claude." icon={<Sparkles className="size-4" />} />
+              <p className="p-4 text-sm leading-7 text-ink-2 sm:p-5">
+                در claude.ai دستیار بدون کلید API کار می‌کند و از Claude حساب خود شما استفاده می‌کند. بار اول، برای اجازه‌ی استفاده سؤال می‌شود.
+                پوسته‌ی روشن و تیره هم از تنظیمات claude.ai پیروی می‌کند.
+              </p>
+            </>
+          ) : (<>
           <CardHeader title="دستیار هوش مصنوعی (اختیاری)" subtitle="پیشنهاد الزام، هدف و فعالیت و نقد برنامه با Claude. کلید فقط روی همین دستگاه ذخیره می‌شود." icon={<Sparkles className="size-4" />} />
           <div className="grid grid-cols-1 gap-3 p-4 sm:p-5">
             <Field label="کلید API (Anthropic)" hint={<>از console.anthropic.com بگیرید. هزینه‌ی هر پیشنهاد معمولاً چند سنت است.</>}>
@@ -93,6 +117,7 @@ export function Settings() {
               {settings.aiKey && <Button variant="ghost" onClick={() => setSettings({ aiKey: "" })}>حذف کلید</Button>}
             </div>
           </div>
+          </>)}
         </Card>
       </div>
 
@@ -119,7 +144,11 @@ export function Settings() {
 
       <Card className="mt-4 p-5 text-sm leading-7 text-ink-2">
         <h2 className="font-semibold text-ink">درباره</h2>
-        <p className="mt-1">هدف‌نگار نسخه‌ی {__APP_VERSION__} — بدون سرور و بدون ثبت‌نام. اپ را می‌توانید روی گوشی «نصب» کنید (Add to Home Screen) تا آفلاین هم کار کند.</p>
+        <p className="mt-1">
+          هدف‌نگار نسخه‌ی {__APP_VERSION__}، متن‌باز با مجوز MIT.{" "}
+          {IS_ARTIFACT ? "این نسخه روی claude.ai اجرا می‌شود." : "بدون سرور و بدون ثبت‌نام. اپ را می‌توانید روی گوشی «نصب» کنید (Add to Home Screen) تا آفلاین هم کار کند."}
+        </p>
+        <p className="mt-1">کد منبع: <a className="text-brand-ink underline" href="https://github.com/ebrahimzar1360/Targeting" target="_blank" rel="noreferrer">github.com/ebrahimzar1360/Targeting</a></p>
       </Card>
 
       <Confirm open={!!toDelete} onOpenChange={(o) => !o && setToDelete(null)} danger confirmLabel="حذف برنامه"

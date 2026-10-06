@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { ReactNode } from "react";
-import { Printer } from "lucide-react";
+import { FileDown, Printer } from "lucide-react";
 import { Button, Card, PageHeader, cx } from "@/components/ui/primitives";
 import {
   activitiesOf, activityProgress, budgetSummary, capacityInRange, categoryStats, expectedProgress, healthChecks,
@@ -10,6 +10,9 @@ import { priorityLabel, statusLabel } from "@/domain/defaults";
 import { faNum, faPct, fmtJ, fmtRange, todayJ } from "@/domain/jalali";
 import type { Activity, Plan } from "@/domain/schema";
 import { usePlan } from "@/store/store";
+import { IS_ARTIFACT } from "@/platform";
+import { saveFile } from "@/io/files";
+import { toast } from "@/components/ui/toast";
 
 type Section = "health" | "matrix" | "phases" | "plan" | "kpi";
 const SECTIONS: { key: Section; label: string }[] = [
@@ -20,9 +23,22 @@ const SECTIONS: { key: Section; label: string }[] = [
   { key: "kpi", label: "شاخص‌ها و نقاط عطف" },
 ];
 
+/** Packs the rendered report and the page's styles into one standalone, printable HTML file. */
+function reportHtml(article: HTMLElement, title: string): string {
+  const css = Array.from(document.styleSheets).map((sheet) => {
+    try { return Array.from(sheet.cssRules).map((r) => r.cssText).join("\n"); } catch { return ""; }
+  }).join("\n");
+  const esc = (s: string) => s.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c]!);
+  return `<!doctype html><html lang="fa" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">`
+    + `<title>${esc(title)}</title><style>${css}</style></head><body><main style="max-width:960px;margin:24px auto;padding:0 16px">`
+    + `<p class="print:hidden" style="font-size:12px;color:#75736d;margin-bottom:12px">برای PDF: این فایل را در مرورگر باز کنید و از منوی چاپ، «Save as PDF» را بزنید.</p>`
+    + article.outerHTML + `</main></body></html>`;
+}
+
 /** A printable one-document view of the plan; the browser's print dialog saves it as PDF. */
 export function Report() {
   const plan = usePlan();
+  const articleRef = useRef<HTMLElement>(null);
   const [on, setOn] = useState<Record<Section, boolean>>({ health: true, matrix: true, phases: true, plan: true, kpi: true });
   const today = todayJ();
   const b = budgetSummary(plan);
@@ -34,8 +50,17 @@ export function Report() {
       <div className="print:hidden">
         <PageHeader
           title="گزارش و چاپ"
-          description="کل برنامه در یک سند؛ برای ارائه به منتور، شریک یا تیم. در پنجره‌ی چاپ، «Save as PDF» را انتخاب کنید تا فایل PDF بگیرید."
-          actions={<Button variant="primary" onClick={() => window.print()}><Printer className="size-4" />چاپ / ذخیره PDF</Button>}
+          description={IS_ARTIFACT ? "کل برنامه در یک سند؛ برای ارائه به منتور، شریک یا تیم. فایل گزارش را ذخیره کنید و در مرورگر چاپ کنید یا PDF بگیرید." : "کل برنامه در یک سند؛ برای ارائه به منتور، شریک یا تیم. در پنجره‌ی چاپ، «Save as PDF» را انتخاب کنید تا فایل PDF بگیرید."}
+          actions={IS_ARTIFACT ? (
+            // claude.ai cannot open the print dialog; the report is saved as a file to print elsewhere.
+            <Button variant="primary" onClick={async () => {
+              if (!articleRef.current) return;
+              try {
+                const res = await saveFile(new Blob([reportHtml(articleRef.current, plan.title)], { type: "text/html" }), "hadafnegar-report.html");
+                if (res === "saved") toast.good("گزارش ذخیره شد؛ آن را در مرورگر باز کنید و چاپ کنید.");
+              } catch (e) { toast.error((e as Error).message); }
+            }}><FileDown className="size-4" />ذخیره گزارش (HTML)</Button>
+          ) : <Button variant="primary" onClick={() => window.print()}><Printer className="size-4" />چاپ / ذخیره PDF</Button>}
         />
         <Card className="mb-6 flex flex-wrap items-center gap-x-5 gap-y-2 p-4 text-sm">
           <span className="text-ink-3">بخش‌های گزارش:</span>
@@ -48,7 +73,7 @@ export function Report() {
         </Card>
       </div>
 
-      <article className="rounded-xl border border-line bg-surface p-5 text-[13px] leading-6 shadow-card sm:p-8 print:border-0 print:p-0 print:shadow-none">
+      <article ref={articleRef} className="rounded-xl border border-line bg-surface p-5 text-[13px] leading-6 shadow-card sm:p-8 print:border-0 print:p-0 print:shadow-none">
         <header className="border-b-2 border-ink pb-4">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
             <h1 className="text-xl font-bold">{plan.title}</h1>

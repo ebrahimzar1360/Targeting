@@ -1,6 +1,30 @@
+import { IS_ARTIFACT, capability, errorCode } from "@/platform";
 import { makeBackup, readBackup } from "@/domain/migrate";
 import { todayJ } from "@/domain/jalali";
 import type { Plan } from "@/domain/schema";
+
+export type SaveResult = "saved" | "declined";
+
+/**
+ * Gives the user a file. On claude.ai the frame cannot download by itself, so the file goes
+ * through the `downloads` capability, which asks the viewer to confirm.
+ */
+export async function saveFile(blob: Blob, filename: string): Promise<SaveResult> {
+  if (IS_ARTIFACT) {
+    const downloads = await capability("downloads");
+    if (!downloads) throw new Error("دانلود فایل در این نما در دسترس نیست.");
+    try {
+      await downloads.save({ filename, data: blob });
+      return "saved";
+    } catch (e) {
+      if (errorCode(e) === "declined") return "declined";
+      if (errorCode(e) === "rate_limited") throw new Error("یک دانلود دیگر در جریان است؛ کمی بعد دوباره امتحان کنید.");
+      throw new Error("دانلود فایل در این نما در دسترس نیست.");
+    }
+  }
+  downloadBlob(blob, filename);
+  return "saved";
+}
 
 export function downloadBlob(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob);
@@ -17,13 +41,13 @@ const stamp = () => todayJ().replace(/\//g, "-");
 
 export function exportJson(plans: Plan[], name = plans.length > 1 ? "hadafnegar-backup" : "hadafnegar-plan") {
   const blob = new Blob([JSON.stringify(makeBackup(plans), null, 2)], { type: "application/json" });
-  downloadBlob(blob, `${safeName(name)}-${stamp()}.json`);
+  return saveFile(blob, `${safeName(name)}-${stamp()}.json`);
 }
 
 export async function exportExcel(plan: Plan) {
   const { planToWorkbook } = await import("./excel");
   const buf = await planToWorkbook(plan);
-  downloadBlob(new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), `hadafnegar-plan-${stamp()}.xlsx`);
+  return saveFile(new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), `hadafnegar-plan-${stamp()}.xlsx`);
 }
 
 /** Reads a backup (.json) or a spreadsheet in the method's template layout (.xlsx). */

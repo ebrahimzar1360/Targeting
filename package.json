@@ -9,7 +9,8 @@
     "build": "tsc --noEmit -p . && vite build",
     "preview": "vite preview",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit -p ."
+    "typecheck": "tsc --noEmit -p .",
+    "build:artifact": "tsc --noEmit -p . && vite build --mode artifact && node scripts/make-artifact.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.131.0",
@@ -39,5 +40,6 @@
   },
   "overrides": {
     "uuid": "^11.1.1"
-  }
+  },
+  "license": "MIT"
 }

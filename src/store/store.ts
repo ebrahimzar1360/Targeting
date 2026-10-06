@@ -1,7 +1,9 @@
+import { useEffect, useState } from "react";
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import { nowIso, uid } from "@/domain/factory";
 import { normalizePlan } from "@/domain/migrate";
+import { appStorage } from "@/platform/storage";
 import type { Activity, Kpi, Milestone, Phase, Plan, Requirement, Review } from "@/domain/schema";
 
 export type Theme = "system" | "light" | "dark";
@@ -139,7 +141,7 @@ export const useStore = create<State>()(
     {
       name: "hadafnegar",
       version: 1,
-      storage: createJSONStorage(() => localStorage),
+      storage: createJSONStorage(() => appStorage),
       partialize: (s) => ({ plans: s.plans, activeId: s.activeId, settings: s.settings, lastBackupAt: s.lastBackupAt }),
       merge: (persisted, current) => {
         const p = (persisted ?? {}) as Partial<State>;
@@ -158,6 +160,16 @@ export const useStore = create<State>()(
     },
   ),
 );
+
+/** False until saved plans are loaded (immediate on the web; the claude.ai build loads them asynchronously). */
+export function useHydrated() {
+  const [done, setDone] = useState(() => useStore.persist.hasHydrated());
+  useEffect(() => {
+    if (useStore.persist.hasHydrated()) setDone(true);
+    return useStore.persist.onFinishHydration(() => setDone(true));
+  }, []);
+  return done;
+}
 
 export const useActivePlan = () => useStore((s) => s.plans.find((p) => p.id === s.activeId) ?? null);
 
