@@ -1,0 +1,168 @@
+@import "tailwindcss";
+@import "@fontsource-variable/vazirmatn";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/*
+ * Design tokens. Components use the semantic names (bg-surface, text-ink-2, …);
+ * light and dark values are both chosen explicitly rather than inverted.
+ * Category colors follow a CVD-validated categorical order; status colors are
+ * reserved for state and always ship with an icon or label.
+ */
+:root {
+  color-scheme: light;
+  --page: #f6f6f4;
+  --surface: #ffffff;
+  --surface-2: #f2f2ef;
+  --surface-3: #e9e8e3;
+  --line: #e4e3dd;
+  --line-strong: #cfcdc5;
+  --ink: #111110;
+  --ink-2: #52514e;
+  --ink-3: #75736d;
+  --brand: #2a78d6;
+  --brand-hover: #256abf;
+  --brand-soft: #e8f1fc;
+  --brand-ink: #1c5cab;
+  --good: #0ca30c;
+  --good-soft: #e7f6e7;
+  --good-ink: #006300;
+  --warning: #fab219;
+  --warning-soft: #fff5de;
+  --warning-ink: #855600;
+  --serious: #ec835a;
+  --serious-soft: #fdefe8;
+  --serious-ink: #a0441c;
+  --critical: #d03b3b;
+  --critical-soft: #fbeaea;
+  --critical-ink: #ab2727;
+  --cat-0: #2a78d6;
+  --cat-1: #eb6834;
+  --cat-2: #1baf7a;
+  --cat-3: #eda100;
+  --cat-4: #e87ba4;
+  --cat-5: #008300;
+  --cat-6: #4a3aa7;
+  --cat-7: #e34948;
+  --shadow: 0 1px 2px rgb(17 17 16 / 0.04), 0 1px 3px rgb(17 17 16 / 0.06);
+  --shadow-lg: 0 10px 30px -10px rgb(17 17 16 / 0.25);
+}
+
+.dark {
+  color-scheme: dark;
+  --page: #0d0d0d;
+  --surface: #1a1a19;
+  --surface-2: #232321;
+  --surface-3: #2c2c2a;
+  --line: #2e2e2b;
+  --line-strong: #43423e;
+  --ink: #f7f7f5;
+  --ink-2: #c3c2b7;
+  --ink-3: #94928b;
+  --brand: #3987e5;
+  --brand-hover: #5598e7;
+  --brand-soft: #172840;
+  --brand-ink: #9ec5f4;
+  --good: #0ca30c;
+  --good-soft: #10260f;
+  --good-ink: #4cc24c;
+  --warning: #fab219;
+  --warning-soft: #2b2210;
+  --warning-ink: #f6c453;
+  --serious: #ec835a;
+  --serious-soft: #2d1a12;
+  --serious-ink: #f0a07f;
+  --critical: #d03b3b;
+  --critical-soft: #2e1414;
+  --critical-ink: #f07a7a;
+  --cat-0: #3987e5;
+  --cat-1: #d95926;
+  --cat-2: #199e70;
+  --cat-3: #c98500;
+  --cat-4: #d55181;
+  --cat-5: #008300;
+  --cat-6: #9085e9;
+  --cat-7: #e66767;
+  --shadow: 0 1px 2px rgb(0 0 0 / 0.4);
+  --shadow-lg: 0 10px 30px -10px rgb(0 0 0 / 0.7);
+}
+
+@theme inline {
+  --font-sans: "Vazirmatn Variable", "Vazirmatn", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --color-page: var(--page);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-brand: var(--brand);
+  --color-brand-hover: var(--brand-hover);
+  --color-brand-soft: var(--brand-soft);
+  --color-brand-ink: var(--brand-ink);
+  --color-good: var(--good);
+  --color-good-soft: var(--good-soft);
+  --color-good-ink: var(--good-ink);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-warning-ink: var(--warning-ink);
+  --color-serious: var(--serious);
+  --color-serious-soft: var(--serious-soft);
+  --color-serious-ink: var(--serious-ink);
+  --color-critical: var(--critical);
+  --color-critical-soft: var(--critical-soft);
+  --color-critical-ink: var(--critical-ink);
+  --shadow-card: var(--shadow);
+  --shadow-pop: var(--shadow-lg);
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+}
+body {
+  @apply bg-page text-ink font-sans antialiased;
+  font-feature-settings: "ss01";
+}
+::selection { background: var(--brand-soft); color: var(--brand-ink); }
+
+.tabular { font-variant-numeric: tabular-nums; }
+
+/* Native range slider styled to the brand. */
+input[type="range"].range {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 6px;
+  border-radius: 999px;
+  background: linear-gradient(to left, var(--brand) var(--fill, 0%), var(--surface-3) var(--fill, 0%));
+  outline: none;
+}
+input[type="range"].range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 18px; height: 18px; border-radius: 999px;
+  background: var(--surface); border: 2px solid var(--brand); box-shadow: var(--shadow);
+  cursor: pointer;
+}
+input[type="range"].range::-moz-range-thumb {
+  width: 16px; height: 16px; border-radius: 999px;
+  background: var(--surface); border: 2px solid var(--brand); cursor: pointer;
+}
+input[type="range"].range:focus-visible { box-shadow: 0 0 0 3px var(--brand-soft); }
+
+/* Sheet & dialog motion. */
+@keyframes fade-in { from { opacity: 0 } to { opacity: 1 } }
+@keyframes sheet-in { from { transform: translateX(-24px); opacity: 0 } to { transform: none; opacity: 1 } }
+@keyframes drawer-in { from { transform: translateX(24px); opacity: 0 } to { transform: none; opacity: 1 } }
+@keyframes rise-in { from { transform: translateY(12px); opacity: 0 } to { transform: none; opacity: 1 } }
+.anim-fade { animation: fade-in 150ms ease-out; }
+.anim-sheet { animation: sheet-in 200ms cubic-bezier(.2,.8,.2,1); }
+.anim-rise { animation: rise-in 200ms cubic-bezier(.2,.8,.2,1); }
+.anim-drawer { animation: drawer-in 200ms cubic-bezier(.2,.8,.2,1); }
+@media (prefers-reduced-motion: reduce) {
+  .anim-fade, .anim-sheet, .anim-rise, .anim-drawer { animation: none; }
+}
+
+.scrollbar-thin { scrollbar-width: thin; }
+.safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
