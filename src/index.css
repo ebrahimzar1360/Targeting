@@ -165,4 +165,10 @@ input[type="range"].range:focus-visible { box-shadow: 0 0 0 3px var(--brand-soft
 }
 
 .scrollbar-thin { scrollbar-width: thin; }
+
+@media print {
+  @page { size: A4; margin: 12mm; }
+  body { background: #fff; }
+  thead { display: table-header-group; }
+}
 .safe-bottom { padding-bottom: env(safe-area-inset-bottom); }

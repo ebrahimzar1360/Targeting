@@ -60,7 +60,7 @@ export function Welcome() {
           <Card className="group flex flex-col p-5">
             <Wand2 className="size-5 text-brand" />
             <h2 className="mt-3 font-semibold">شروع از صفر</h2>
-            <p className="mt-1 flex-1 text-sm leading-6 text-ink-3">راهنمای سه‌گامی برای ساخت برنامه‌ی خودتان.</p>
+            <p className="mt-1 flex-1 text-sm leading-6 text-ink-3">راهنمای سه‌گامی؛ از صفر یا با قالب آماده (کسب‌وکار خدماتی، فروشگاه اینترنتی، ارتقای شغلی).</p>
             <Button variant="primary" className="mt-4" onClick={() => setCreating(true)}>ساخت برنامه<ArrowLeft className="size-4" /></Button>
           </Card>
           <Card className="flex flex-col p-5">

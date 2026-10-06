@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Flag, Plus, Trash2, Wand2 } from "lucide-react";
-import { Button, Card, CardHeader, Field, IconButton, Input, NumberInput, PageHeader, Textarea, catColor, cx } from "@/components/ui/primitives";
+import { Button, Card, CardHeader, Field, IconButton, Input, NumberInput, PageHeader, ProgressBar, Textarea, catColor, cx } from "@/components/ui/primitives";
+import { capacityInRange, hoursInRange } from "@/domain/calc";
 import { DatePicker } from "@/components/ui/DatePicker";
 import { Confirm } from "@/components/ui/overlays";
 import { toast } from "@/components/ui/toast";
@@ -115,6 +116,7 @@ function PhasesCard({ plan }: { plan: Plan }) {
               <DatePicker value={ph.end} onChange={(v) => upsert({ ...ph, end: v })} min={ph.start} />
             </div>
             <Input value={ph.description} onChange={(e) => upsert({ ...ph, description: e.target.value })} placeholder="هدف این فاز در یک جمله" className="mt-2 h-8 text-[13px]" aria-label="توضیح فاز" />
+            <PhaseLoad plan={plan} start={ph.start} end={ph.end} />
           </li>
         ))}
         <li>
@@ -126,6 +128,25 @@ function PhasesCard({ plan }: { plan: Plan }) {
       </ul>
       <Confirm open={confirm} onOpenChange={setConfirm} title="فازها از نو ساخته شوند؟" description="فازهای فعلی با ۴ فاز مساوی در افق برنامه جایگزین می‌شوند (قابل برگرداندن)." confirmLabel="ساختن" onConfirm={regenerate} />
     </Card>
+  );
+}
+
+/** Planned hours in a phase against the capacity of the same period. */
+function PhaseLoad({ plan, start, end }: { plan: Plan; start: string; end: string }) {
+  if (!start || !end || end < start || !plan.weeklyHours) return null;
+  const need = hoursInRange(plan, start, end), cap = capacityInRange(plan, start, end);
+  const ratio = cap ? need / cap : 0;
+  const over = ratio > 1.05;
+  return (
+    <div className="mt-3">
+      <div className="mb-1 flex justify-between text-xs">
+        <span className="text-ink-3">بار کاری این فاز</span>
+        <span className={cx("tabular", over ? "font-medium text-serious-ink" : "text-ink-2")}>
+          {faNum(Math.round(need), 0)} ساعت لازم / {faNum(Math.round(cap), 0)} ساعت ظرفیت{over ? ` · ${faNum(Math.round(ratio * 10) / 10)} برابر` : ""}
+        </span>
+      </div>
+      <ProgressBar value={Math.min(1, ratio)} tone={over ? "serious" : "good"} height={4} label="بار کاری فاز نسبت به ظرفیت" />
+    </div>
   );
 }
 

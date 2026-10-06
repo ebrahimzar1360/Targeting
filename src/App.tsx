@@ -14,15 +14,24 @@ import { Budget } from "@/pages/Budget";
 import { Review } from "@/pages/Review";
 import { Settings } from "@/pages/Settings";
 import { Guide } from "@/pages/Guide";
+import { Report } from "@/pages/Report";
 
 function useTheme() {
   const theme = useStore((s) => s.settings.theme);
   useEffect(() => {
     const mq = matchMedia("(prefers-color-scheme: dark)");
     const apply = () => document.documentElement.classList.toggle("dark", theme === "dark" || (theme === "system" && mq.matches));
+    // Always print in the light theme.
+    const light = () => document.documentElement.classList.remove("dark");
     apply();
     mq.addEventListener("change", apply);
-    return () => mq.removeEventListener("change", apply);
+    window.addEventListener("beforeprint", light);
+    window.addEventListener("afterprint", apply);
+    return () => {
+      mq.removeEventListener("change", apply);
+      window.removeEventListener("beforeprint", light);
+      window.removeEventListener("afterprint", apply);
+    };
   }, [theme]);
 }
 
@@ -43,7 +52,7 @@ function useUndoShortcut() {
 
 const PAGES = {
   dashboard: Dashboard, vision: Vision, requirements: Requirements, plan: ActionPlan,
-  kpi: Kpis, budget: Budget, review: Review, settings: Settings, guide: Guide,
+  kpi: Kpis, budget: Budget, review: Review, report: Report, settings: Settings, guide: Guide,
 };
 
 export default function App() {

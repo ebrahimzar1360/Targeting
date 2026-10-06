@@ -6,13 +6,15 @@ Persian (RTL) goal-setting PWA for the «ماتریس ساختار طراحی» 
 
 - `npm run dev` — dev server
 - `npm test` — vitest (domain + Excel round trip). `GOAL_XLSX=/path/goal.xlsx npm test` also imports an original spreadsheet.
-- `npm run build` — typecheck + production build (`dist/`, deployed to GitHub Pages by `.github/workflows/deploy.yml`)
+- `npm run build` — typecheck + production build (`dist/`). `.github/workflows/deploy.yml` tests every push and publishes the repo's default branch to GitHub Pages.
 
 ## Architecture
 
 - `src/domain/` is pure logic with no React: `schema.ts` (zod model, single source of types), `jalali.ts` (dates), `calc.ts` (progress, capacity, budget, health checks), `factory.ts`, `migrate.ts`. Put new rules here and test them in `domain.test.ts`.
 - `src/store/store.ts` — one zustand store. All plan edits go through `edit(label, recipe)`, which records an undo step; don't mutate plans elsewhere.
 - Pages in `src/pages/`, editing sheets in `src/components/editors.tsx`, UI primitives in `src/components/ui/`.
+- `src/data/templates.ts` — starter templates (vision, role model, requirements with desired states). Add a template by appending an entry.
+- `src/pages/Report.tsx` — printable report; print styles use Tailwind `print:` variants, and the app switches to light theme on `beforeprint`.
 - `src/io/excel.ts` reads and writes the original spreadsheet layout. It is header-driven, so keep header labels stable.
 - `src/ai/claude.ts` is optional. It loads `@anthropic-ai/sdk` lazily, uses `client.beta.messages.parse` with zod output formats, and only returns suggestions. The UI never applies them without a click.
 

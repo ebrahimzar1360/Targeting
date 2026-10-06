@@ -8,6 +8,7 @@ import { addDays, addMonths, faDigits, fmtJ, formatJ, parseJ, todayJ } from "@/d
 import { useStore } from "@/store/store";
 import { navigate } from "@/router";
 import { toast } from "@/components/ui/toast";
+import { TEMPLATES, applyTemplate } from "@/data/templates";
 
 const STEPS = ["چشم‌انداز", "افق و ظرفیت", "مرور"];
 
@@ -24,14 +25,27 @@ export function NewPlanDialog({ open, onOpenChange }: { open: boolean; onOpenCha
     title: "", vision: "", model: "", start: nextMonthStart(), months: 12, weeklyHours: 10, budgetMin: 0, budgetMax: 0, withPhases: true,
   });
   const set = <K extends keyof typeof f>(k: K, v: (typeof f)[K]) => setF((x) => ({ ...x, [k]: v }));
+  const [tplId, setTplId] = useState("blank");
+  const tpl = TEMPLATES.find((t) => t.id === tplId);
+  const chooseTemplate = (id: string) => {
+    const prev = TEMPLATES.find((t) => t.id === tplId), next = TEMPLATES.find((t) => t.id === id);
+    setTplId(id);
+    // Replace only what the previous template filled in, never the user's own text.
+    setF((x) => ({
+      ...x,
+      title: !x.title || x.title === prev?.title ? (next?.title ?? "") : x.title,
+      vision: !x.vision || x.vision === prev?.vision ? (next?.vision ?? "") : x.vision,
+      model: !x.model || x.model === prev?.model ? (next?.model ?? "") : x.model,
+    }));
+  };
   const canNext = step !== 0 || (f.title.trim() && f.vision.trim());
 
   const finish = () => {
-    const plan = createPlan(f);
-    addPlan(plan);
+    const base = createPlan(f);
+    addPlan(tpl ? applyTemplate(base, tpl) : base);
     onOpenChange(false);
     setStep(0);
-    toast.good("برنامه ساخته شد. حالا الزامات را در ۷ دسته بنویسید.");
+    toast.good(tpl ? "برنامه از روی قالب ساخته شد. «وضعیت موجود» و «هدف» هر الزام را کامل کنید." : "برنامه ساخته شد. حالا الزامات را در ۷ دسته بنویسید.");
     navigate("requirements");
   };
 
@@ -65,6 +79,17 @@ export function NewPlanDialog({ open, onOpenChange }: { open: boolean; onOpenCha
 
       {step === 0 && (
         <div className="grid grid-cols-1 gap-4">
+          <Field label="شروع از">
+            <div role="radiogroup" aria-label="قالب شروع" className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              {[{ id: "blank", title: "برنامه‌ی خالی", description: "ماتریس را خودتان از صفر می‌نویسید." }, ...TEMPLATES].map((t) => (
+                <button key={t.id} type="button" role="radio" aria-checked={tplId === t.id} onClick={() => chooseTemplate(t.id)}
+                  className={cx("rounded-lg border p-3 text-start transition-colors", tplId === t.id ? "border-brand bg-brand-soft/60 ring-2 ring-brand/15" : "border-line hover:border-line-strong")}>
+                  <div className="text-[13px] font-semibold">{t.title}</div>
+                  <div className="mt-0.5 text-xs leading-5 text-ink-3">{t.description}</div>
+                </button>
+              ))}
+            </div>
+          </Field>
           <Field label="نام برنامه" htmlFor="np-title">
             <Input id="np-title" autoFocus value={f.title} onChange={(e) => set("title", e.target.value)} placeholder="مثلاً: راه‌اندازی کسب‌وکار مشاوره" />
           </Field>
@@ -102,6 +127,7 @@ export function NewPlanDialog({ open, onOpenChange }: { open: boolean; onOpenCha
             ["نام", f.title],
             ["چشم‌انداز", f.vision],
             ["الگو", f.model || "—"],
+            ["شروع از", tpl ? `قالب «${tpl.title}» (${faDigits(tpl.requirements.length)} الزام)` : "برنامه‌ی خالی"],
             ["افق", `${fmtJ(f.start)} تا ${fmtJ(addDays(addMonths(f.start, f.months), -1))}`],
             ["ظرفیت", `${faDigits(f.weeklyHours)} ساعت در هفته`],
             ["بودجه", f.budgetMax ? `${faDigits(f.budgetMin)} تا ${faDigits(f.budgetMax)} میلیون تومان` : "تعیین نشده"],

@@ -25,7 +25,7 @@ export const toast = {
 export function Toaster() {
   const { items, dismiss } = useToasts();
   return (
-    <div aria-live="polite" className="pointer-events-none fixed inset-x-0 bottom-20 z-[60] flex flex-col items-center gap-2 px-4 lg:inset-x-auto lg:bottom-6 lg:start-6 lg:items-start lg:px-0">
+    <div aria-live="polite" className="pointer-events-none fixed inset-x-0 bottom-20 z-[60] flex print:hidden flex-col items-center gap-2 px-4 lg:inset-x-auto lg:bottom-6 lg:start-6 lg:items-start lg:px-0">
       {items.map((t) => (
         <div key={t.id} className="anim-rise pointer-events-auto flex w-full max-w-sm items-center gap-3 rounded-xl bg-ink px-4 py-3 text-sm text-page shadow-pop">
           {t.tone === "good" && <CheckCircle2 className="size-4 shrink-0 text-good" />}

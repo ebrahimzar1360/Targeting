@@ -1,8 +1,8 @@
 import { useSyncExternalStore } from "react";
 
 /** Minimal hash router: "#/plan?open=a12" → { page: "plan", params: { open: "a12" } }. Works on any static host. */
-export type Page = "dashboard" | "vision" | "requirements" | "plan" | "kpi" | "budget" | "review" | "settings" | "guide";
-const PAGES: Page[] = ["dashboard", "vision", "requirements", "plan", "kpi", "budget", "review", "settings", "guide"];
+export type Page = "dashboard" | "vision" | "requirements" | "plan" | "kpi" | "budget" | "review" | "report" | "settings" | "guide";
+const PAGES: Page[] = ["dashboard", "vision", "requirements", "plan", "kpi", "budget", "review", "report", "settings", "guide"];
 
 export interface Route { page: Page; params: Record<string, string> }
 

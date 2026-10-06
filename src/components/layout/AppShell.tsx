@@ -1,14 +1,14 @@
 import { DropdownMenu } from "radix-ui";
 import {
   BookOpen, CalendarCheck, Check, ChevronsUpDown, Grid3x3, LayoutDashboard, ListChecks, Menu, Plus,
-  Settings, Target, Telescope, TrendingUp, Wallet,
+  Printer, Settings, Target, Telescope, TrendingUp, Wallet,
 } from "lucide-react";
 import { useState } from "react";
 import type { ReactNode } from "react";
 import { useRoute } from "@/router";
 import type { Page } from "@/router";
 import { useStore, useActivePlan } from "@/store/store";
-import { faDigits } from "@/domain/jalali";
+import { faDigits, todayJ, weekStart } from "@/domain/jalali";
 import { cx } from "../ui/primitives";
 import { NewPlanDialog } from "@/pages/NewPlanDialog";
 
@@ -23,6 +23,7 @@ const NAV: NavItem[] = [
   { page: "review", label: "بازبینی هفتگی", icon: CalendarCheck },
 ];
 const NAV_SECONDARY: NavItem[] = [
+  { page: "report", label: "گزارش و چاپ", icon: Printer },
   { page: "guide", label: "راهنمای روش", icon: BookOpen },
   { page: "settings", label: "تنظیمات و پشتیبان", icon: Settings },
 ];
@@ -83,7 +84,22 @@ function PlanSwitcher() {
   );
 }
 
+/** True when the plan has started and this week's review is not recorded yet. */
+function useReviewDue() {
+  const plan = useActivePlan();
+  if (!plan) return false;
+  const today = todayJ();
+  if (!plan.start || today < plan.start || today > plan.end) return false;
+  const ws = weekStart(today);
+  return !plan.reviews.some((r) => r.date >= ws);
+}
+
+const DueDot = ({ className }: { className?: string }) => (
+  <span className={cx("size-2 rounded-full bg-serious ring-2 ring-surface", className)} aria-label="بازبینی این هفته انجام نشده" role="img" />
+);
+
 function NavLink({ item, active, onClick }: { item: NavItem; active: boolean; onClick?: () => void }) {
+  const due = useReviewDue() && item.page === "review";
   const Icon = item.icon;
   return (
     <a
@@ -97,6 +113,7 @@ function NavLink({ item, active, onClick }: { item: NavItem; active: boolean; on
     >
       <Icon className="size-[18px] shrink-0" />
       <span className="flex-1">{item.label}</span>
+      {due && <DueDot />}
       {item.step && (
         <span className={cx("grid size-5 place-items-center rounded-full text-[11px]", active ? "bg-brand text-white" : "bg-surface-2 text-ink-3 group-hover:bg-surface-3")}>
           {faDigits(item.step)}
@@ -124,28 +141,29 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
 
 export function AppShell({ children }: { children: ReactNode }) {
   const { page } = useRoute();
+  const reviewDue = useReviewDue();
   const [moreOpen, setMoreOpen] = useState(false);
   return (
-    <div className="min-h-dvh lg:grid lg:grid-cols-[260px_1fr]">
-      <aside className="sticky top-0 hidden h-dvh border-e border-line bg-surface/60 lg:block">
+    <div className="min-h-dvh lg:grid lg:grid-cols-[260px_1fr] print:block">
+      <aside className="sticky top-0 hidden h-dvh border-e border-line bg-surface/60 lg:block print:hidden">
         <SidebarContent />
       </aside>
 
-      <header className="sticky top-0 z-30 flex items-center justify-between border-b border-line bg-surface/90 px-4 py-2.5 backdrop-blur lg:hidden">
+      <header className="sticky top-0 z-30 flex items-center justify-between border-b border-line bg-surface/90 px-4 py-2.5 backdrop-blur lg:hidden print:hidden">
         <Logo />
       </header>
 
-      <main className="mx-auto w-full max-w-6xl px-4 pb-28 pt-5 sm:px-6 lg:px-8 lg:pb-12 lg:pt-8">{children}</main>
+      <main className="mx-auto w-full max-w-6xl px-4 pb-28 pt-5 sm:px-6 lg:px-8 lg:pb-12 lg:pt-8 print:max-w-none print:p-0">{children}</main>
 
       {/* Mobile bottom navigation */}
-      <nav aria-label="ناوبری اصلی" className="safe-bottom fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t border-line bg-surface/95 backdrop-blur lg:hidden">
+      <nav aria-label="ناوبری اصلی" className="safe-bottom fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t border-line bg-surface/95 backdrop-blur lg:hidden print:hidden">
         {MOBILE.map((n) => {
           const Icon = n.icon;
           const active = page === n.page;
           return (
             <a key={n.page} href={`#/${n.page}`} aria-current={active ? "page" : undefined}
               className={cx("flex flex-col items-center gap-0.5 py-2 text-[11px]", active ? "font-semibold text-brand-ink" : "text-ink-3")}>
-              <Icon className="size-5" />{n.label}
+              <span className="relative"><Icon className="size-5" />{reviewDue && n.page === "review" && <DueDot className="absolute -end-1 -top-0.5" />}</span>{n.label}
             </a>
           );
         })}

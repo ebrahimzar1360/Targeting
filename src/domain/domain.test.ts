@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildSampleConsultant } from "@/data/sampleConsultant";
-import { budgetSummary, expectedProgress, healthChecks, kpiValue, planProgress, requirementProgress, weeklyLoad } from "./calc";
+import { budgetSummary, capacityInRange, expectedProgress, healthChecks, hoursInRange, kpiValue, planProgress, requirementProgress, weeklyLoad } from "./calc";
 import { createPlan, quarterlyPhases } from "./factory";
 import { addDays, addMonths, dayNumber, diffDays, fmtJ, isValidJ, monthsBetween, normalizeDigits, parseLooseJ, weekday, weekStart } from "./jalali";
 import { normalizePlan, readBackup, makeBackup } from "./migrate";
@@ -105,6 +105,14 @@ describe("calc", () => {
     expect(dayNumber(weeks[1].start) - dayNumber(weeks[0].start)).toBe(7);
   });
 
+  it("splits hours across phases and compares them with capacity", () => {
+    const perPhase = plan.phases.map((p) => hoursInRange(plan, p.start, p.end));
+    const total = plan.activities.reduce((s, a) => s + a.hours, 0);
+    expect(perPhase.reduce((a, b) => a + b, 0)).toBeCloseTo(total, 6);
+    // Phase 1 of the sample needs far more than 15 h/week.
+    expect(perPhase[0]).toBeGreaterThan(capacityInRange(plan, plan.phases[0].start, plan.phases[0].end) * 1.5);
+  });
+
   it("computes expected progress over time", () => {
     expect(expectedProgress(plan, "1405/06/01")).toBe(0);
     expect(expectedProgress(plan, "1407/01/01")).toBe(1);
@@ -133,5 +141,20 @@ describe("migrate", () => {
   });
   it("rejects non-objects", () => {
     expect(() => normalizePlan("nope")).toThrow();
+  });
+});
+
+describe("templates", () => {
+  it("fill a new plan with valid requirements in every category", async () => {
+    const { TEMPLATES, applyTemplate } = await import("@/data/templates");
+    for (const t of TEMPLATES) {
+      const base = createPlan({ title: t.title, vision: t.vision, model: t.model, start: "1405/07/01", months: 12, weeklyHours: 10, budgetMin: 0, budgetMax: 0, withPhases: true });
+      const plan = applyTemplate(base, t);
+      expect(plan.requirements, t.id).toHaveLength(t.requirements.length);
+      for (const c of plan.categories) expect(plan.requirements.some((r) => r.categoryId === c.id), `${t.id}/${c.id}`).toBe(true);
+      expect(new Set(plan.requirements.map((r) => r.id)).size).toBe(plan.requirements.length);
+      // Goals are left for the user, so the health panel asks for them.
+      expect(healthChecks(plan, "1405/07/01").some((i) => i.key === "no-goal")).toBe(true);
+    }
   });
 });

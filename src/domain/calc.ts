@@ -94,6 +94,23 @@ export function weeklyLoad(plan: Plan, includeDone = true): WeekLoad[] {
   return weeks;
 }
 
+/** Planned hours that fall inside [from, to], spreading each activity evenly over its days. */
+export function hoursInRange(plan: Plan, from: JDate, to: JDate): number {
+  const f = dayNumber(from), t = dayNumber(to);
+  let total = 0;
+  for (const a of plan.activities) {
+    if (!a.hours || !a.start || !a.end) continue;
+    const s = dayNumber(a.start), e = dayNumber(a.end);
+    if (!(e >= s)) continue;
+    const overlap = Math.min(e, t) - Math.max(s, f) + 1;
+    if (overlap > 0) total += (a.hours * overlap) / (e - s + 1);
+  }
+  return total;
+}
+
+/** Hours of capacity in [from, to] at the plan's weekly rate. */
+export const capacityInRange = (plan: Plan, from: JDate, to: JDate) => (plan.weeklyHours * (diffDays(from, to) + 1)) / 7;
+
 // ---------- Budget ----------
 
 export function budgetSummary(plan: Plan) {

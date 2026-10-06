@@ -1,8 +1,8 @@
 name: Test and deploy to GitHub Pages
 
+# Tests run on every push and pull request; the site is published from the default branch.
 on:
   push:
-    branches: [main]
   pull_request:
   workflow_dispatch:
 
@@ -12,7 +12,7 @@ permissions:
   id-token: write
 
 concurrency:
-  group: pages
+  group: pages-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -28,12 +28,12 @@ jobs:
       - run: npm test
       - run: npm run build
       - uses: actions/upload-pages-artifact@v3
-        if: github.event_name != 'pull_request'
+        if: github.event_name != 'pull_request' && github.ref_name == github.event.repository.default_branch
         with:
           path: dist
 
   deploy:
-    if: github.event_name != 'pull_request'
+    if: github.event_name != 'pull_request' && github.ref_name == github.event.repository.default_branch
     needs: build
     runs-on: ubuntu-latest
     environment:
