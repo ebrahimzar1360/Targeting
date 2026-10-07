@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "test": "vitest run",
     "typecheck": "tsc --noEmit -p .",
-    "build:artifact": "tsc --noEmit -p . && vite build --mode artifact && node scripts/make-artifact.mjs"
+    "build:artifact": "tsc --noEmit -p . && vite build --mode artifact && node scripts/make-artifact.mjs",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.131.0",
@@ -26,6 +27,7 @@
     "zustand": "^5.0.15"
   },
   "devDependencies": {
+    "@playwright/test": "^1.56.1",
     "@tailwindcss/vite": "^4.3.3",
     "@types/jalaali-js": "^1.2.0",
     "@types/react": "^19.3.0",

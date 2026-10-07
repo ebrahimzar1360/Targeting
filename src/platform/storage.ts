@@ -19,7 +19,7 @@ const withoutKey = (s: unknown) => {
   return rest;
 };
 
-interface Persisted { state: { plans?: { id: string }[]; activeId?: string | null; settings?: unknown; lastBackupAt?: string | null }; version?: number }
+interface Persisted { state: { plans?: { id: string; updatedAt?: string }[]; activeId?: string | null; settings?: unknown; lastBackupAt?: string | null }; version?: number }
 
 /**
  * claude.ai storage: each viewer's plans live in their own private subtree of the artifact's
@@ -34,6 +34,34 @@ function accountStorage(): StateStorage {
   let pending: string | null = null;
   let timer: ReturnType<typeof setTimeout> | undefined;
   let writing = Promise.resolve();
+  /** Local copy key; per account, since accounts signed in on one browser share the artifact's origin. */
+  let localKey: string | null = null;
+
+  /** Latest plan edit time in a persisted snapshot (ISO strings compare chronologically). */
+  const newest = (json: string | null) => {
+    if (!json) return "";
+    try {
+      return ((JSON.parse(json) as Persisted).state.plans ?? []).reduce((m, p) => ((p.updatedAt ?? "") > m ? p.updatedAt! : m), "");
+    } catch { return ""; }
+  };
+
+  const schedule = (value: string, delay: number) => {
+    pending = value;
+    clearTimeout(timer);
+    timer = setTimeout(flushNow, delay);
+  };
+  function flushNow() {
+    if (pending === null) return;
+    clearTimeout(timer);
+    const v = pending;
+    pending = null;
+    writing = writing.then(() => flush(v));
+  }
+  // Don't leave the last edit waiting when the viewer switches away or closes the page.
+  if (typeof window !== "undefined") {
+    window.addEventListener("pagehide", flushNow);
+    document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") flushNow(); });
+  }
 
   const resolveTarget = async () => {
     const [db, user] = await Promise.all([capability("db"), capability("user")]);
@@ -75,14 +103,16 @@ function accountStorage(): StateStorage {
 
   return {
     async getItem(name) {
-      const cached = local.getItem(name) as string | null;
       target = await resolveTarget();
+      localKey = target ? `${name}:${target.base.slice("data/users/".length)}` : name;
+      const cached = local.getItem(localKey) as string | null;
       if (!target) return cached;
       try {
         const app = await target.db.doc(`${target.base}/app`).get();
         if (!app.exists) {
           useStorageMode.setState({ mode: "account" });
-          return cached; // first visit: start from (and later upload) whatever this browser has
+          if (cached) schedule(cached, 0); // first visit: upload whatever this browser already has
+          return cached;
         }
         const a = app.data() as { version?: number; planIds?: string[]; activeId?: string | null; settings?: unknown; lastBackupAt?: string | null };
         const plans: unknown[] = [];
@@ -96,23 +126,24 @@ function accountStorage(): StateStorage {
           version: a.version ?? 1, planIds: a.planIds ?? [], activeId: a.activeId ?? null, settings: a.settings ?? null, lastBackupAt: a.lastBackupAt ?? null,
         }));
         useStorageMode.setState({ mode: "account" });
-        return JSON.stringify({ state: { plans, activeId: a.activeId ?? null, settings: a.settings ?? undefined, lastBackupAt: a.lastBackupAt ?? null }, version: a.version ?? 1 });
+        const fromDb = JSON.stringify({ state: { plans, activeId: a.activeId ?? null, settings: a.settings ?? undefined, lastBackupAt: a.lastBackupAt ?? null }, version: a.version ?? 1 });
+        // An edit saved locally but not yet in the account (page closed mid-save, a failed
+        // write) is newer than the account copy: keep it and finish uploading it.
+        if (cached && newest(cached) > newest(fromDb)) {
+          schedule(cached, 0);
+          return cached;
+        }
+        return fromDb;
       } catch {
         target = null;
         return cached;
       }
     },
     setItem(name, value) {
-      local.setItem(name, value);
+      local.setItem(localKey ?? name, value);
       if (!target) return;
       // Coalesce bursts of edits (typing, sliders) into one save per pause.
-      pending = value;
-      clearTimeout(timer);
-      timer = setTimeout(() => {
-        const v = pending!;
-        pending = null;
-        writing = writing.then(() => flush(v));
-      }, 800);
+      schedule(value, 800);
     },
     removeItem: local.removeItem,
   };

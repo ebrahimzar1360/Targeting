@@ -5,3 +5,5 @@ dev-dist
 .DS_Store
 coverage
 dist-artifact
+test-results
+playwright-report

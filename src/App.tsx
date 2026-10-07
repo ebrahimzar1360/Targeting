@@ -16,6 +16,8 @@ import { Settings } from "@/pages/Settings";
 import { Guide } from "@/pages/Guide";
 import { Report } from "@/pages/Report";
 import { IS_ARTIFACT } from "@/platform";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { navigate } from "@/router";
 
 /**
  * Light/dark theme. On the web it follows the user's setting; on claude.ai it follows the
@@ -87,9 +89,12 @@ export default function App() {
           <div className="grid min-h-dvh place-items-center text-sm text-ink-3" role="status">در حال بارگذاری برنامه‌ها…</div>
         ) : plan ? (
           // Remount pages on plan switch so local editor state never leaks across plans.
-          <AppShell><PageComp key={plan.id} /></AppShell>
+          // A page that crashes is replaced by a recovery card; the navigation stays usable.
+          <AppShell>
+            <ErrorBoundary key={`${plan.id}:${page}`} onReset={() => navigate("dashboard")}><PageComp key={plan.id} /></ErrorBoundary>
+          </AppShell>
         ) : (
-          <Welcome />
+          <ErrorBoundary><Welcome /></ErrorBoundary>
         )}
         <Toaster />
       </Tooltip.Provider>

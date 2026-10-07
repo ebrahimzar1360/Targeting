@@ -1,5 +1,5 @@
-import { useMemo } from "react";
-import { AlertCircle, AlertTriangle, ArrowLeft, CalendarClock, CheckCircle2, ChevronDown, Flag, Info, Sparkles, XCircle } from "lucide-react";
+import { useMemo, useState } from "react";
+import { AlertCircle, AlertTriangle, ArrowLeft, CalendarClock, CheckCircle2, ChevronDown, Download, Flag, Info, Sparkles, XCircle } from "lucide-react";
 import { Badge, Button, Card, CardHeader, CategoryDot, catColor, cx } from "@/components/ui/primitives";
 import { BarList, CapacityChart, ProgressRing } from "@/components/charts";
 import { AiBox, AiButton, AiError, useAi } from "@/components/AiPanel";
@@ -8,7 +8,10 @@ import type { PlanReview } from "@/ai/claude";
 import { budgetSummary, categoryStats, expectedProgress, healthChecks, isActiveOn, isOverdue, phaseOf, planProgress, weeklyLoad } from "@/domain/calc";
 import type { Severity } from "@/domain/calc";
 import { addDays, diffDays, faNum, faPct, fmtJ, relDays, todayJ, weekStart } from "@/domain/jalali";
-import { usePlan } from "@/store/store";
+import { usePlan, useStore } from "@/store/store";
+import { useStorageMode } from "@/platform/storage";
+import { exportJson } from "@/io/files";
+import { toast } from "@/components/ui/toast";
 import { navigate } from "@/router";
 import type { Page } from "@/router";
 
@@ -38,6 +41,7 @@ export function Dashboard() {
     .sort((a, b) => a.end.localeCompare(b.end)).slice(0, 6);
   const nextMilestone = plan.milestones.find((m) => !m.done && m.date >= today);
   const ai = useAi<PlanReview>();
+  const backupDue = useBackupDue(plan.createdAt);
   const delta = progress - expected;
 
   return (
@@ -46,6 +50,18 @@ export function Dashboard() {
         <div className="text-[13px] text-ink-3">{fmtJ(today)}{phase ? ` · ${phase.name}` : ""}</div>
         <h1 className="text-xl font-bold leading-8 sm:text-2xl">{plan.title || "داشبورد"}</h1>
       </div>
+      {backupDue.due && (
+        <div className="mb-4 flex flex-col gap-3 rounded-xl border border-warning/50 bg-warning-soft p-4 text-sm text-warning-ink sm:flex-row sm:items-center" role="status">
+          <AlertTriangle className="size-5 shrink-0" aria-label="هشدار" />
+          <p className="flex-1 leading-6">
+            برنامه‌ها فقط در همین مرورگر ذخیره شده‌اند و اگر داده‌های مرورگر پاک شود از بین می‌روند. هر دو هفته یک فایل پشتیبان بگیرید.
+          </p>
+          <div className="flex shrink-0 gap-2">
+            <Button size="sm" variant="primary" onClick={backupDue.backup}><Download className="size-4" />گرفتن پشتیبان</Button>
+            <Button size="sm" variant="ghost" onClick={backupDue.dismiss}>بعداً</Button>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <Card className="p-5 lg:col-span-2">
@@ -207,6 +223,23 @@ export function Dashboard() {
       </Card>
     </>
   );
+}
+
+/** Remind to back up when plans live only in this browser: never backed up after a few days, or a stale backup. */
+function useBackupDue(createdAt: string) {
+  const mode = useStorageMode((s) => s.mode);
+  const lastBackupAt = useStore((s) => s.lastBackupAt);
+  const plans = useStore((s) => s.plans);
+  const markBackup = useStore((s) => s.markBackup);
+  const [dismissed, setDismissed] = useState(false);
+  const days = (iso: string) => (Date.now() - Date.parse(iso)) / 86_400_000;
+  const due = mode === "device" && !dismissed && (lastBackupAt ? days(lastBackupAt) > 14 : !!createdAt && days(createdAt) > 3);
+  const backup = async () => {
+    try {
+      if ((await exportJson(plans, "hadafnegar-backup")) === "saved") { markBackup(); toast.good("فایل پشتیبان ذخیره شد."); }
+    } catch (e) { toast.error((e as Error).message); }
+  };
+  return { due, backup, dismiss: () => setDismissed(true) };
 }
 
 function Stat({ label, value, unit, hint, tone, onClick }: { label: string; value: string; unit?: string; hint?: string; tone?: "critical" | "serious"; onClick?: () => void }) {

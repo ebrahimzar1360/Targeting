@@ -6,6 +6,7 @@ Persian (RTL) goal-setting PWA for the «ماتریس ساختار طراحی» 
 
 - `npm run dev` — dev server
 - `npm test` — vitest (domain + Excel round trip). `GOAL_XLSX=/path/goal.xlsx npm test` also imports an original spreadsheet.
+- `npm run test:e2e` — Playwright browser tests (`tests/e2e/`) against the production build; run `npm run build` first. CI runs them before every deploy.
 - `npm run build:artifact` — the claude.ai build: one self-contained page at `dist-artifact/hadafnegar.html` (published as https://claude.ai/artifact/MkioP4edQenGAhLek63JNb).
 - `npm run build` — typecheck + production build (`dist/`). `.github/workflows/deploy.yml` tests every push and publishes the repo's default branch to GitHub Pages.
 
