@@ -1,13 +1,14 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Circle, CircleCheck, CircleDot, CirclePause, GanttChart, List, Plus, Search } from "lucide-react";
 import { Badge, Button, Card, CategoryDot, EmptyState, Input, PageHeader, ProgressBar, Segmented, Select, Tip, catColor, cx } from "@/components/ui/primitives";
 import { ActivitySheet } from "@/components/editors";
-import { activityProgress, isOverdue, phaseOf, requirementProgress } from "@/domain/calc";
+import { activityProgress, isOverdue, moveActivityEnd, phaseOf, requirementProgress, shiftActivity, weeklyLoad } from "@/domain/calc";
 import { newActivity } from "@/domain/factory";
 import { dayNumber, diffDays, faNum, faPct, fmtJ, fmtRange, monthsBetween, relDays, todayJ } from "@/domain/jalali";
 import type { Activity, Plan, Status } from "@/domain/schema";
 import { useStore, usePlan } from "@/store/store";
 import { clearParams, useRoute } from "@/router";
+import { toast } from "@/components/ui/toast";
 
 type GroupBy = "goal" | "phase" | "none";
 type StatusFilter = "all" | "open" | "overdue" | Status;
@@ -211,56 +212,134 @@ function ActivityRow({ plan, a, today, catSlot, showGoal, goalTitle, onOpen }: {
 
 // ---------- Timeline (Gantt) ----------
 
+interface DragState { id: string; mode: "move" | "end"; x0: number; daysPerPx: number; a0: Activity; moved: boolean }
+
+/** Mouse and pen only; on touch, dragging would fight horizontal scrolling, so taps open the editor. */
+const canDrag = () => typeof matchMedia !== "undefined" && matchMedia("(pointer: fine)").matches;
+
 function Timeline({ plan, groups, today, catOf, onOpen }: {
   plan: Plan; groups: { key: string; title: string; items: Activity[] }[]; today: string;
   catOf: (a: Activity) => { color: number } | undefined; onOpen: (a: Activity) => void;
 }) {
+  const upsert = useStore((s) => s.upsertActivity);
+  const [preview, setPreview] = useState<{ id: string; start: string; end: string } | null>(null);
+  const drag = useRef<DragState | null>(null);
+  const suppressClick = useRef(false);
   const months = monthsBetween(plan.start, plan.end);
   const start = dayNumber(plan.start), end = dayNumber(plan.end);
   const span = Math.max(1, end - start + 1);
   const pos = (j: string) => ((Math.max(start, Math.min(end + 1, dayNumber(j))) - start) / span) * 100;
   const todayPct = today >= plan.start && today <= plan.end ? pos(today) : null;
 
+  // Weekly load, recomputed live while a bar is being dragged.
+  const weeks = useMemo(() => {
+    const p = preview ? { ...plan, activities: plan.activities.map((a) => (a.id === preview.id ? { ...a, start: preview.start, end: preview.end } : a)) } : plan;
+    return weeklyLoad(p);
+  }, [plan, preview]);
+  const peak = Math.max(plan.weeklyHours, ...weeks.map((w) => w.hours), 1);
+
+  const next = (d: DragState, clientX: number) => {
+    // RTL: time runs right to left, so moving the pointer left means later dates.
+    const days = Math.round(-(clientX - d.x0) * d.daysPerPx);
+    return d.mode === "move" ? shiftActivity(d.a0, days) : moveActivityEnd(d.a0, days);
+  };
+  const onDown = (e: React.PointerEvent<HTMLElement>, a: Activity, mode: DragState["mode"]) => {
+    if (!canDrag() || e.button !== 0) return;
+    const track = (e.currentTarget as HTMLElement).closest("[data-track]") as HTMLElement | null;
+    if (!track) return;
+    e.stopPropagation();
+    drag.current = { id: a.id, mode, x0: e.clientX, daysPerPx: span / track.getBoundingClientRect().width, a0: a, moved: false };
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+  };
+  const onMove = (e: React.PointerEvent) => {
+    const d = drag.current;
+    if (!d) return;
+    if (!d.moved && Math.abs(e.clientX - d.x0) < 4) return;
+    d.moved = true;
+    const n = next(d, e.clientX);
+    setPreview({ id: d.id, start: n.start, end: n.end });
+  };
+  const onUp = (e: React.PointerEvent) => {
+    const d = drag.current;
+    drag.current = null;
+    if (!d?.moved) return; // a plain click opens the editor through onClick
+    suppressClick.current = true;
+    setPreview(null);
+    const n = next(d, e.clientX);
+    if (n.start === d.a0.start && n.end === d.a0.end) return;
+    upsert(n);
+    toast.info(`«${d.a0.title.slice(0, 40)}»: ${fmtRange(n.start, n.end)}`, { label: "برگرداندن", run: () => useStore.getState().undo() });
+  };
+
   return (
     <Card className="overflow-hidden">
       <div className="scrollbar-thin overflow-x-auto">
         <div className="min-w-[900px]">
-          {/* Month header */}
-          <div className="sticky top-0 z-10 grid grid-cols-[240px_1fr] border-b border-line bg-surface">
-            <div className="border-e border-line px-4 py-2 text-xs font-medium text-ink-3">فعالیت</div>
-            <div className="relative h-14">
-              {plan.phases.map((p, i) => (
-                <div key={p.id} className={cx("absolute top-0 h-6 truncate border-e border-line px-2 text-[11px] leading-6 text-ink-2", i % 2 ? "bg-surface-2" : "bg-surface-2/40")}
-                  style={{ insetInlineStart: `${pos(p.start)}%`, width: `${pos(p.end) - pos(p.start) + 100 / span}%` }} title={p.name}>{p.name}</div>
-              ))}
-              {months.map((m) => (
-                <div key={m.key} className="absolute bottom-0 h-8 border-e border-line px-1.5 pt-1.5 text-[11px] text-ink-3"
-                  style={{ insetInlineStart: `${pos(m.start)}%`, width: `${pos(m.end) - pos(m.start) + 100 / span}%` }}>{m.label}</div>
-              ))}
+          {/* Month header and weekly load */}
+          <div className="sticky top-0 z-10 border-b border-line bg-surface">
+            <div className="grid grid-cols-[240px_1fr]">
+              <div className="border-e border-line px-4 py-2 text-xs font-medium text-ink-3">فعالیت</div>
+              <div className="relative h-14">
+                {plan.phases.map((p, i) => (
+                  <div key={p.id} className={cx("absolute top-0 h-6 truncate border-e border-line px-2 text-[11px] leading-6 text-ink-2", i % 2 ? "bg-surface-2" : "bg-surface-2/40")}
+                    style={{ insetInlineStart: `${pos(p.start)}%`, width: `${pos(p.end) - pos(p.start) + 100 / span}%` }} title={p.name}>{p.name}</div>
+                ))}
+                {months.map((m) => (
+                  <div key={m.key} className="absolute bottom-0 h-8 border-e border-line px-1.5 pt-1.5 text-[11px] text-ink-3"
+                    style={{ insetInlineStart: `${pos(m.start)}%`, width: `${pos(m.end) - pos(m.start) + 100 / span}%` }}>{m.label}</div>
+                ))}
+              </div>
             </div>
+            {plan.weeklyHours > 0 && (
+              <div className="grid grid-cols-[240px_1fr] border-t border-line">
+                <div className="border-e border-line px-4 py-1.5 text-[11px] leading-4 text-ink-3">
+                  بار هفتگی<br /><span className="text-ink-2">ظرفیت {faNum(plan.weeklyHours, 0)} ساعت</span>
+                </div>
+                <div className="relative h-10" aria-label="بار کاری هفتگی" role="img">
+                  <div className="absolute inset-x-0 border-t border-dashed border-ink/50" style={{ bottom: `${(plan.weeklyHours / peak) * 100}%` }} />
+                  {weeks.map((w) => {
+                    const over = w.hours > plan.weeklyHours * 1.05;
+                    return (
+                      <div key={w.start} title={`${fmtRange(w.start, w.end)}: ${Math.round(w.hours)} ساعت`}
+                        className={cx("absolute bottom-0 rounded-t-[2px] transition-[height] duration-150", over ? "bg-serious" : "bg-brand/70")}
+                        style={{ insetInlineStart: `calc(${pos(w.start)}% + 1px)`, width: `calc(${(7 / span) * 100}% - 2px)`, height: `${(w.hours / peak) * 100}%` }} />
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
 
           {groups.map((g) => (
             <div key={g.key}>
               {g.title && <div className="border-b border-line bg-surface-2/50 px-4 py-1.5 text-xs font-semibold text-ink-2">{g.title}</div>}
-              {g.items.map((a) => {
+              {g.items.map((orig) => {
+                const a = preview?.id === orig.id ? { ...orig, start: preview.start, end: preview.end } : orig;
                 const color = catOf(a)?.color;
                 const left = pos(a.start), width = Math.max(0.6, pos(a.end) - left + 100 / span);
                 const p = activityProgress(a);
+                const dragging = preview?.id === orig.id;
                 return (
                   <div key={a.id} className="grid grid-cols-[240px_1fr] border-b border-line last:border-b-0 hover:bg-surface-2/40">
-                    <button onClick={() => onOpen(a)} className="truncate border-e border-line px-4 py-2 text-start text-[13px]" title={a.title}>{a.title}</button>
-                    <div className="relative">
+                    <button onClick={() => onOpen(orig)} className="truncate border-e border-line px-4 py-2 text-start text-[13px]" title={a.title}>{a.title}</button>
+                    <div className="relative" data-track>
                       {months.map((m) => <div key={m.key} className="absolute inset-y-0 border-e border-line/60" style={{ insetInlineStart: `${pos(m.start)}%` }} />)}
                       {todayPct !== null && <div className="absolute inset-y-0 w-px bg-critical/70" style={{ insetInlineStart: `${todayPct}%` }} />}
-                      <Tip label={<span>{a.title}<br />{fmtRange(a.start, a.end)} · {faPct(p / 100)}{isOverdue(a, today) ? " · عقب‌افتاده" : ""}</span>}>
+                      {dragging && (
+                        <span className="pointer-events-none absolute -top-0.5 z-20 whitespace-nowrap rounded bg-ink px-1.5 text-[10px] leading-4 text-page" style={{ insetInlineStart: `${left}%` }}>
+                          {fmtRange(a.start, a.end)}
+                        </span>
+                      )}
+                      <Tip label={<span>{a.title}<br />{fmtRange(a.start, a.end)} · {faPct(p / 100)}{isOverdue(a, today) ? " · عقب‌افتاده" : ""}<br /><span className="opacity-70">برای جابه‌جایی بکشید؛ لبه‌ی انتها برای تغییر مدت</span></span>}>
                         <button
-                          onClick={() => onOpen(a)}
-                          aria-label={a.title}
-                          className={cx("absolute top-1/2 h-4 -translate-y-1/2 overflow-hidden rounded", isOverdue(a, today) && "ring-2 ring-critical/60")}
+                          onClick={() => { if (suppressClick.current) { suppressClick.current = false; return; } onOpen(orig); }}
+                          onPointerDown={(e) => onDown(e, orig, "move")} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={() => { drag.current = null; setPreview(null); }}
+                          aria-label={`${a.title}، ${fmtRange(a.start, a.end)}`}
+                          className={cx("absolute top-1/2 h-4 -translate-y-1/2 overflow-hidden rounded [@media(pointer:fine)]:cursor-grab", dragging && "z-10 cursor-grabbing shadow-pop ring-2 ring-brand", isOverdue(a, today) && !dragging && "ring-2 ring-critical/60")}
                           style={{ insetInlineStart: `${left}%`, width: `${width}%`, background: color !== undefined ? `color-mix(in srgb, ${catColor(color)} 28%, transparent)` : "var(--surface-3)" }}
                         >
                           <span className="block h-full rounded" style={{ width: `${p}%`, background: color !== undefined ? catColor(color) : "var(--ink-3)" }} />
+                          <span aria-hidden onPointerDown={(e) => onDown(e, orig, "end")} className="absolute inset-y-0 end-0 w-2 [@media(pointer:fine)]:cursor-ew-resize" />
                         </button>
                       </Tip>
                     </div>
@@ -274,7 +353,9 @@ function Timeline({ plan, groups, today, catOf, onOpen }: {
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-line px-4 py-2.5 text-xs text-ink-3">
         {plan.categories.map((c) => <span key={c.id} className="inline-flex items-center gap-1.5"><CategoryDot slot={c.color} />{c.name}</span>)}
         <span className="inline-flex items-center gap-1.5"><span className="h-3 w-px bg-critical" />امروز ({fmtJ(today, "short")})</span>
+        <span className="inline-flex items-center gap-1.5"><span className="size-2.5 rounded-sm bg-serious" />هفته‌ی بیش از ظرفیت</span>
         <span>بخش پررنگ هر نوار = درصد پیشرفت</span>
+        <span className="hidden [@media(pointer:fine)]:inline">نوارها را برای جابه‌جایی بکشید</span>
       </div>
     </Card>
   );

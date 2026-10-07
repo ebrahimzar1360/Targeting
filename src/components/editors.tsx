@@ -7,7 +7,7 @@ import { toast } from "./ui/toast";
 import { AiBox, AiButton, AiError, useAi } from "./AiPanel";
 import { suggestActivities, suggestGoals } from "@/ai/claude";
 import type { ActivityIdea, GoalIdea } from "@/ai/claude";
-import { activitiesOf, goalChecks, isOverdue, requirementProgress } from "@/domain/calc";
+import { activitiesOf, goalChecks, isOverdue, requirementProgress, shiftActivity } from "@/domain/calc";
 import { PRIORITIES, STATUSES, statusLabel } from "@/domain/defaults";
 import { newActivity, newRequirement } from "@/domain/factory";
 import { diffDays, faNum, faPct, fmtJ, fmtRange, todayJ } from "@/domain/jalali";
@@ -218,6 +218,9 @@ export function useNewRequirement(plan: Plan) {
 
 // ---------- Activity ----------
 
+/** Quick reschedules; the most common fix for weeks over capacity. */
+const SHIFTS: [number, string][] = [[-7, "یک هفته زودتر"], [7, "یک هفته بعد"], [14, "دو هفته بعد"], [30, "یک ماه بعد"]];
+
 export function ActivitySheet({ plan, activity, onClose }: { plan: Plan; activity: Activity | null; onClose: () => void }) {
   const upsert = useStore((s) => s.upsertActivity);
   const remove = useStore((s) => s.deleteActivity);
@@ -281,6 +284,14 @@ export function ActivitySheet({ plan, activity, onClose }: { plan: Plan; activit
           <Field label="تاریخ شروع"><DatePicker value={draft.start} onChange={(v) => set("start", v)} /></Field>
           <Field label="تاریخ پایان"><DatePicker value={draft.end} onChange={(v) => set("end", v)} min={draft.start} /></Field>
         </div>
+        {draft.start && draft.end && (
+          <div className="-mt-2 flex flex-wrap items-center gap-1.5" role="group" aria-label="جابه‌جایی کل فعالیت">
+            <span className="text-xs text-ink-3">جابه‌جایی کل فعالیت:</span>
+            {SHIFTS.map(([days, label]) => (
+              <Button key={days} size="sm" variant="ghost" className="h-7 border border-line px-2 text-xs" onClick={() => setDraft(shiftActivity(draft, days))}>{label}</Button>
+            ))}
+          </div>
+        )}
         {lateForGoal && (
           <p className="-mt-2 flex items-start gap-2 rounded-lg bg-warning-soft px-3 py-2 text-[13px] leading-6 text-warning-ink">
             <CircleAlert className="mt-1 size-4 shrink-0" />پایان این فعالیت بعد از موعد هدف ({fmtJ(req!.dueDate)}) است.

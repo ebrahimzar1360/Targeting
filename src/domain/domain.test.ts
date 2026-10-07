@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildSampleConsultant } from "@/data/sampleConsultant";
-import { budgetSummary, capacityInRange, expectedProgress, healthChecks, hoursInRange, kpiValue, planProgress, requirementProgress, weeklyLoad } from "./calc";
+import { budgetSummary, capacityInRange, expectedProgress, healthChecks, hoursInRange, kpiValue, moveActivityEnd, planProgress, requirementProgress, shiftActivity, weeklyLoad } from "./calc";
 import { createPlan, quarterlyPhases } from "./factory";
 import { addDays, addMonths, dayNumber, diffDays, fmtJ, isValidJ, monthsBetween, normalizeDigits, parseLooseJ, weekday, weekStart } from "./jalali";
 import { normalizePlan, readBackup, makeBackup } from "./migrate";
@@ -111,6 +111,15 @@ describe("calc", () => {
     expect(perPhase.reduce((a, b) => a + b, 0)).toBeCloseTo(total, 6);
     // Phase 1 of the sample needs far more than 15 h/week.
     expect(perPhase[0]).toBeGreaterThan(capacityInRange(plan, plan.phases[0].start, plan.phases[0].end) * 1.5);
+  });
+
+  it("shifts activities and their end dates", () => {
+    const a = { ...plan.activities[0], start: "1405/07/01", end: "1405/07/10" };
+    expect(shiftActivity(a, 30)).toMatchObject({ start: "1405/08/01", end: "1405/08/10" }); // Mehr has 30 days
+    expect(shiftActivity(a, -1)).toMatchObject({ start: "1405/06/31", end: "1405/07/09" });
+    expect(moveActivityEnd(a, 5).end).toBe("1405/07/15");
+    expect(moveActivityEnd(a, -20).end).toBe("1405/07/01"); // never before the start
+    expect(shiftActivity(a, 0)).toBe(a);
   });
 
   it("computes expected progress over time", () => {

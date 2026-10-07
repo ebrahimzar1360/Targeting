@@ -56,6 +56,17 @@ export function phaseOf(plan: Plan, j: JDate): Phase | undefined {
   return plan.phases.find((p) => p.start <= j && j <= p.end);
 }
 
+/** Moves an activity by `days` (negative = earlier), keeping its length. */
+export const shiftActivity = (a: Activity, days: number): Activity =>
+  days && a.start && a.end ? { ...a, start: addDays(a.start, days), end: addDays(a.end, days) } : a;
+
+/** Moves only the end date by `days`; the end never goes before the start. */
+export function moveActivityEnd(a: Activity, days: number): Activity {
+  if (!days || !a.end) return a;
+  const end = addDays(a.end, days);
+  return { ...a, end: a.start && end < a.start ? a.start : end };
+}
+
 /** Activities whose dates overlap [from, to]. */
 export const overlapping = (acts: Activity[], from: JDate, to: JDate) =>
   acts.filter((a) => a.start && a.end && a.start <= to && a.end >= from);
