@@ -11,7 +11,7 @@ import { AI_MODELS, useStore, usePlan } from "@/store/store";
 import type { Theme } from "@/store/store";
 import { NewPlanDialog } from "./NewPlanDialog";
 import { navigate } from "@/router";
-import { IS_ARTIFACT } from "@/platform";
+import { IS_ARTIFACT, LINKS } from "@/platform";
 import { useStorageMode } from "@/platform/storage";
 import type { SaveResult } from "@/io/files";
 
@@ -92,6 +92,10 @@ export function Settings() {
           ) : (<>
           <CardHeader title="دستیار هوش مصنوعی (اختیاری)" subtitle="پیشنهاد الزام، هدف و فعالیت و نقد برنامه با Claude. کلید فقط روی همین دستگاه ذخیره می‌شود." icon={<Sparkles className="size-4" />} />
           <div className="grid grid-cols-1 gap-3 p-4 sm:p-5">
+            <p className="rounded-lg bg-brand-soft/50 px-3 py-2 text-[13px] leading-6 text-ink-2">
+              بدون کلید هم می‌شود: <a className="font-medium text-brand-ink underline" href={LINKS.claudeAi} target="_blank" rel="noreferrer">نسخه‌ی claude.ai</a> از
+              Claude حساب خودتان استفاده می‌کند و هزینه‌ی جدا ندارد. برنامه‌ها را با پشتیبان (JSON) به آنجا ببرید.
+            </p>
             <Field label="کلید API (Anthropic)" hint={<>از console.anthropic.com بگیرید. هزینه‌ی هر پیشنهاد معمولاً چند سنت است.</>}>
               <div className="flex gap-2">
                 <Input type={showKey ? "text" : "password"} dir="ltr" value={settings.aiKey} onChange={(e) => setSettings({ aiKey: e.target.value })} placeholder="sk-ant-..." autoComplete="off" />

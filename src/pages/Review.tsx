@@ -1,8 +1,9 @@
 import { useMemo, useState } from "react";
-import { CalendarCheck, Check, History, TrendingUp } from "lucide-react";
+import { CalendarCheck, CalendarPlus, Check, History, TrendingUp } from "lucide-react";
 import { Badge, Button, Card, CardHeader, CategoryDot, EmptyState, Field, PageHeader, Textarea, cx } from "@/components/ui/primitives";
 import { CapacityChart } from "@/components/charts";
 import { StatusBadge } from "@/components/editors";
+import { CalendarDialog } from "@/components/CalendarDialog";
 import { toast } from "@/components/ui/toast";
 import { activityProgress, isOverdue, overlapping, planProgress, weeklyLoad } from "@/domain/calc";
 import { uid } from "@/domain/factory";
@@ -29,6 +30,7 @@ export function Review() {
   const lastReview = plan.reviews[plan.reviews.length - 1];
   const reviewedThisWeek = lastReview && lastReview.date >= ws;
   const [form, setForm] = useState({ wins: "", blockers: "", focus: "", mood: 3 });
+  const [calendar, setCalendar] = useState(false);
   const p = parseJ(today)!;
   const monthEndSoon = p.jd >= monthLength(p.jy, p.jm) - 4 || p.jd <= 3;
   const over = weeks.filter((w) => w.hours > plan.weeklyHours * 1.05);
@@ -44,8 +46,12 @@ export function Review() {
       <PageHeader
         title="بازبینی هفتگی"
         description="هر هفته حدود ۳۰ دقیقه: پیشرفت فعالیت‌ها را به‌روز کنید، بار کاری هفته‌ی بعد را ببینید، و تمرکز هفته را بنویسید."
-        actions={<Badge tone={reviewedThisWeek ? "good" : "neutral"} dot>{reviewedThisWeek ? "این هفته بازبینی شده" : lastReview ? `آخرین بازبینی: ${relDays(diffDays(today, lastReview.date))}` : "هنوز بازبینی‌ای ثبت نشده"}</Badge>}
+        actions={<>
+          <Badge tone={reviewedThisWeek ? "good" : "neutral"} dot>{reviewedThisWeek ? "این هفته بازبینی شده" : lastReview ? `آخرین بازبینی: ${relDays(diffDays(today, lastReview.date))}` : "هنوز بازبینی‌ای ثبت نشده"}</Badge>
+          <Button size="sm" onClick={() => setCalendar(true)}><CalendarPlus className="size-4" />یادآور در تقویم</Button>
+        </>}
       />
+      <CalendarDialog plan={plan} open={calendar} onOpenChange={setCalendar} />
 
       {monthEndSoon && plan.kpis.length > 0 && (
         <button onClick={() => navigate("kpi")} className="mb-4 flex w-full items-center gap-3 rounded-xl border border-brand/30 bg-brand-soft p-4 text-start text-sm text-brand-ink">

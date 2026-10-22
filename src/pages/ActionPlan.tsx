@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Circle, CircleCheck, CircleDot, CirclePause, GanttChart, List, Plus, Search } from "lucide-react";
+import { CalendarPlus, Circle, CircleCheck, CircleDot, CirclePause, GanttChart, List, Plus, Search } from "lucide-react";
 import { Badge, Button, Card, CategoryDot, EmptyState, Input, PageHeader, ProgressBar, Segmented, Select, Tip, catColor, cx } from "@/components/ui/primitives";
 import { ActivitySheet } from "@/components/editors";
+import { CalendarDialog } from "@/components/CalendarDialog";
 import { activityProgress, isOverdue, moveActivityEnd, phaseOf, requirementProgress, shiftActivity, weeklyLoad } from "@/domain/calc";
 import { newActivity } from "@/domain/factory";
 import { dayNumber, diffDays, faNum, faPct, fmtJ, fmtRange, monthsBetween, relDays, todayJ } from "@/domain/jalali";
@@ -17,6 +18,7 @@ export function ActionPlan() {
   const plan = usePlan();
   const { params } = useRoute();
   const [editing, setEditing] = useState<Activity | null>(null);
+  const [calendar, setCalendar] = useState(false);
   const [view, setView] = useState<"list" | "timeline">("list");
   const [groupBy, setGroupBy] = useState<GroupBy>("goal");
   const [status, setStatus] = useState<StatusFilter>("all");
@@ -76,8 +78,12 @@ export function ActionPlan() {
         step={3}
         title="برنامه عملیاتی"
         description="هر هدف ← برنامه ← فعالیت‌های تاریخ‌دار. ساعت و هزینه را عددی وارد کنید تا ظرفیت و بودجه خودکار حساب شوند."
-        actions={<Button variant="primary" onClick={() => setEditing(newActivity(plan))}><Plus className="size-4" />فعالیت جدید</Button>}
+        actions={<>
+          <Button onClick={() => setCalendar(true)}><CalendarPlus className="size-4" />افزودن به تقویم</Button>
+          <Button variant="primary" onClick={() => setEditing(newActivity(plan))}><Plus className="size-4" />فعالیت جدید</Button>
+        </>}
       />
+      <CalendarDialog plan={plan} open={calendar} onOpenChange={setCalendar} />
 
       <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
         {[

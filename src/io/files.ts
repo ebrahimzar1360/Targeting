@@ -50,6 +50,10 @@ export async function exportExcel(plan: Plan) {
   return saveFile(new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), `hadafnegar-plan-${stamp()}.xlsx`);
 }
 
+export function exportCalendar(ics: string) {
+  return saveFile(new Blob([ics], { type: "text/calendar;charset=utf-8" }), `hadafnegar-calendar-${stamp()}.ics`);
+}
+
 /** Reads a backup (.json) or a spreadsheet in the method's template layout (.xlsx). */
 export async function importFile(file: File): Promise<Plan[]> {
   if (/\.xlsx$/i.test(file.name)) {

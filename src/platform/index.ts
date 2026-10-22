@@ -34,3 +34,15 @@ export function capability<K extends keyof CapabilityMap>(name: K): Promise<Capa
 }
 
 export const errorCode = (e: unknown) => (e && typeof e === "object" && "code" in e ? String((e as CapabilityError).code) : "");
+
+/** The two published copies of the app. */
+export const LINKS = {
+  web: "https://ebrahimzar1360.github.io/Targeting/",
+  claudeAi: "https://claude.ai/artifact/MkioP4edQenGAhLek63JNb",
+};
+
+/** This copy's own address, for links back to the app (in calendar events). */
+export function appUrl(): string {
+  if (IS_ARTIFACT) return LINKS.claudeAi;
+  return typeof location !== "undefined" && /^https?:$/.test(location.protocol) ? location.origin + location.pathname : LINKS.web;
+}

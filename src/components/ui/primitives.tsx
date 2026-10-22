@@ -13,29 +13,25 @@ export const catColor = (slot: number) => `var(--cat-${slot % 8})`;
 type Variant = "primary" | "secondary" | "ghost" | "danger" | "soft";
 type Size = "sm" | "md" | "icon" | "icon-sm";
 
+/** Button styles, also for links that look like buttons. */
+export const buttonClass = (variant: Variant = "secondary", size: Size = "md", className?: string) => cx(
+  "inline-flex shrink-0 select-none items-center justify-center gap-2 rounded-lg font-medium transition-colors",
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40 disabled:pointer-events-none disabled:opacity-50",
+  size === "md" && "h-9 px-3.5 text-sm",
+  size === "sm" && "h-8 px-2.5 text-[13px]",
+  size === "icon" && "size-9",
+  size === "icon-sm" && "size-8",
+  variant === "primary" && "bg-brand text-white shadow-card hover:bg-brand-hover",
+  variant === "secondary" && "border border-line bg-surface text-ink shadow-card hover:bg-surface-2",
+  variant === "ghost" && "text-ink-2 hover:bg-surface-2 hover:text-ink",
+  variant === "soft" && "bg-brand-soft text-brand-ink hover:bg-brand-soft/70",
+  variant === "danger" && "bg-critical text-white hover:opacity-90",
+  className,
+);
+
 export const Button = forwardRef<HTMLButtonElement, ButtonHTMLAttributes<HTMLButtonElement> & { variant?: Variant; size?: Size }>(
   function Button({ variant = "secondary", size = "md", className, type = "button", ...rest }, ref) {
-    return (
-      <button
-        ref={ref}
-        type={type}
-        className={cx(
-          "inline-flex shrink-0 select-none items-center justify-center gap-2 rounded-lg font-medium transition-colors",
-          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40 disabled:pointer-events-none disabled:opacity-50",
-          size === "md" && "h-9 px-3.5 text-sm",
-          size === "sm" && "h-8 px-2.5 text-[13px]",
-          size === "icon" && "size-9",
-          size === "icon-sm" && "size-8",
-          variant === "primary" && "bg-brand text-white shadow-card hover:bg-brand-hover",
-          variant === "secondary" && "border border-line bg-surface text-ink shadow-card hover:bg-surface-2",
-          variant === "ghost" && "text-ink-2 hover:bg-surface-2 hover:text-ink",
-          variant === "soft" && "bg-brand-soft text-brand-ink hover:bg-brand-soft/70",
-          variant === "danger" && "bg-critical text-white hover:opacity-90",
-          className,
-        )}
-        {...rest}
-      />
-    );
+    return <button ref={ref} type={type} className={buttonClass(variant, size, className)} {...rest} />;
   },
 );
 

@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { expect, test } from "@playwright/test";
 
 const loadSample = async (page: import("@playwright/test").Page) => {
@@ -60,6 +61,31 @@ test("Excel export downloads a workbook", async ({ page }) => {
     page.getByRole("button", { name: "خروجی Excel برنامه‌ی فعلی" }).click(),
   ]);
   expect(download.suggestedFilename()).toMatch(/^hadafnegar-plan-\d{4}-\d{2}-\d{2}\.xlsx$/);
+});
+
+test("calendar export downloads an .ics file with deadlines and the weekly review", async ({ page }) => {
+  await page.clock.setFixedTime(new Date("2026-10-22T10:00:00+03:30")); // 30 Mehr 1405, inside the sample's year
+  await loadSample(page);
+  await page.goto("./#/plan");
+  await page.getByRole("button", { name: "افزودن به تقویم" }).click();
+  const dialog = page.getByRole("dialog");
+  const [download] = await Promise.all([
+    page.waitForEvent("download"),
+    dialog.getByRole("button", { name: /دانلود فایل تقویم/ }).click(),
+  ]);
+  expect(download.suggestedFilename()).toMatch(/^hadafnegar-calendar-\d{4}-\d{2}-\d{2}\.ics$/);
+  const ics = readFileSync(await download.path(), "utf8");
+  expect(ics).toContain("BEGIN:VCALENDAR");
+  expect(ics).toContain("RRULE:FREQ=WEEKLY");
+  expect(ics).toContain("DTSTART:20261023T100000"); // the next Friday
+  expect(ics.match(/BEGIN:VEVENT/g)!.length).toBeGreaterThan(10);
+});
+
+test("without an API key the assistant points to the claude.ai version", async ({ page }) => {
+  await loadSample(page);
+  await page.getByRole("button", { name: "نقد برنامه" }).click();
+  const link = page.getByRole("dialog").getByRole("link", { name: /باز کردن نسخه‌ی claude.ai/ });
+  await expect(link).toHaveAttribute("href", /^https:\/\/claude\.ai\/artifact\//);
 });
 
 test("@phone no page scrolls sideways on a phone", async ({ page }) => {
